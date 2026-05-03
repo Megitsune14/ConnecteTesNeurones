@@ -38,6 +38,98 @@ const hiddenInputsMap: Record<
   }),
 }
 
+function buildOutputInputsFromHidden(
+  hiddenList: NeuronData[],
+  outputNeuronId: string
+): Record<string, number> {
+  const getH = (id: string) =>
+    hiddenList.find((n) => n.id === id)?.calculatedOutput ?? 0
+  const inputs: Record<string, number> = {}
+  switch (outputNeuronId) {
+    case 'NEURONE0':
+      inputs.C = getH('C')
+      inputs.E = getH('E')
+      inputs.F = getH('F')
+      inputs.A = -getH('A')
+      inputs.B = -getH('B')
+      inputs.D = -getH('D')
+      break
+    case 'NEURONE3':
+      inputs.A = getH('A')
+      inputs.B = getH('B')
+      inputs.D = getH('D')
+      inputs.C = -getH('C')
+      inputs.E = -getH('E')
+      break
+    case 'NEURONE6':
+      inputs.B = getH('B')
+      inputs.D = getH('D')
+      inputs.E = getH('E')
+      inputs.A = -getH('A')
+      inputs.C = -getH('C')
+      inputs.F = -getH('F')
+      break
+    case 'NEURONE9':
+      inputs.A = getH('A')
+      inputs.B = getH('B')
+      inputs.C = getH('C')
+      inputs.D = -getH('D')
+      inputs.E = -getH('E')
+      break
+    default:
+      break
+  }
+  return Object.fromEntries(
+    Object.entries(inputs).map(([k, v]) => [k, Number(v) || 0])
+  )
+}
+
+function applyHiddenThresholdMap(
+  prev: NeuronData[],
+  neuronId: string,
+  t: number
+): NeuronData[] {
+  return prev.map((n) => {
+    if (n.id !== neuronId) return n
+    if (n.threshold === t) return n
+    const nextCalcOut =
+      n.sumValidated && n.calculatedSum != null
+        ? Math.max(0, n.calculatedSum - t)
+        : n.calculatedOutput
+    return {
+      ...n,
+      threshold: t,
+      calculatedOutput:
+        n.sumValidated && n.calculatedSum != null
+          ? nextCalcOut ?? null
+          : n.calculatedOutput,
+      outputValidated: false,
+      needsRecalculation: true,
+      userOutputInput: '',
+    }
+  })
+}
+
+function cascadeInvalidateOutputs(
+  nextHidden: NeuronData[],
+  prevOutputs: NeuronData[]
+): NeuronData[] {
+  return prevOutputs.map((outputNeuron) => {
+    const inputs = buildOutputInputsFromHidden(nextHidden, outputNeuron.id)
+    return {
+      ...outputNeuron,
+      inputs,
+      sumValidated: false,
+      calculatedSum: null,
+      outputValidated: false,
+      calculatedOutput: null,
+      needsRecalculation: true,
+      userSumInput: '',
+      userOutputInput: '',
+    }
+  })
+}
+
 const STORAGE_KEY_STEP = 'grandPublicStep'
 const STORAGE_KEY_DRAWN_GRID = 'grandPublicDrawnGrid'
 const STORAGE_KEY_SELECTED_DIGIT = 'grandPublicSelectedDigit'
@@ -269,6 +361,7 @@ export function useGrandPublicActivity() {
           sumValidated: false,
           calculatedOutput: null,
           outputValidated: false,
+          needsRecalculation: false,
           userSumInput: '',
           userOutputInput: '',
         }
@@ -292,6 +385,7 @@ export function useGrandPublicActivity() {
           sumValidated: true,
           calculatedOutput: output,
           outputValidated: true,
+          needsRecalculation: false,
           userSumInput: String(sum),
           userOutputInput: String(output),
         }
@@ -358,6 +452,7 @@ export function useGrandPublicActivity() {
           sumValidated: true,
           calculatedOutput: output,
           outputValidated: true,
+          needsRecalculation: false,
           userSumInput: String(sum),
           userOutputInput: String(output),
         }
@@ -365,6 +460,51 @@ export function useGrandPublicActivity() {
     )
     setActiveNeuronId(null)
   }, [hiddenNeurons])
+
+  const applySeuilThreshold = useCallback(
+    (neuronId: string, newThreshold: number) => {
+      const t = Math.round(newThreshold)
+      const hiddenIds = NETWORK_STRUCTURE.hidden as readonly string[]
+      const outputIds = NETWORK_STRUCTURE.output as readonly string[]
+
+      if (hiddenIds.includes(neuronId)) {
+        const target = hiddenNeurons.find((n) => n.id === neuronId)
+        if (!target || target.threshold === t) return
+        setFinalDecision(null)
+        setHiddenNeurons((prevH) => {
+          const nextH = applyHiddenThresholdMap(prevH, neuronId, t)
+          setOutputNeurons((prevO) => cascadeInvalidateOutputs(nextH, prevO))
+          return nextH
+        })
+        return
+      }
+
+      if (outputIds.includes(neuronId)) {
+        const target = outputNeurons.find((n) => n.id === neuronId)
+        if (!target || target.threshold === t) return
+        setFinalDecision(null)
+        setOutputNeurons((prev) =>
+          prev.map((n) => {
+            if (n.id !== neuronId) return n
+            if (n.threshold === t) return n
+            const nextCalcOut =
+              n.calculatedSum != null
+                ? Math.max(0, n.calculatedSum - t)
+                : n.calculatedOutput
+            return {
+              ...n,
+              threshold: t,
+              calculatedOutput: nextCalcOut ?? null,
+              outputValidated: false,
+              needsRecalculation: true,
+              userOutputInput: '',
+            }
+          })
+        )
+      }
+    },
+    [hiddenNeurons, outputNeurons]
+  )
 
   useEffect(() => {
     if (hiddenNeurons.length === 0) return
@@ -384,53 +524,21 @@ export function useGrandPublicActivity() {
             sumValidated: false,
             calculatedOutput: null,
             outputValidated: false,
+            needsRecalculation: false,
             userSumInput: '',
             userOutputInput: '',
             digit,
           }
         })
       }
-      const getHidden = (id: string) =>
-        hiddenNeurons.find((n) => n.id === id)?.calculatedOutput ?? 0
       return prev.map((outputNeuron) => {
-        const inputs: Record<string, number> = {}
-        switch (outputNeuron.id) {
-          case 'NEURONE0':
-            inputs.C = getHidden('C')
-            inputs.E = getHidden('E')
-            inputs.F = getHidden('F')
-            inputs.A = -getHidden('A')
-            inputs.B = -getHidden('B')
-            inputs.D = -getHidden('D')
-            break
-          case 'NEURONE3':
-            inputs.A = getHidden('A')
-            inputs.B = getHidden('B')
-            inputs.D = getHidden('D')
-            inputs.C = -getHidden('C')
-            inputs.E = -getHidden('E')
-            break
-          case 'NEURONE6':
-            inputs.B = getHidden('B')
-            inputs.D = getHidden('D')
-            inputs.E = getHidden('E')
-            inputs.A = -getHidden('A')
-            inputs.C = -getHidden('C')
-            inputs.F = -getHidden('F')
-            break
-          case 'NEURONE9':
-            inputs.A = getHidden('A')
-            inputs.B = getHidden('B')
-            inputs.C = getHidden('C')
-            inputs.D = -getHidden('D')
-            inputs.E = -getHidden('E')
-            break
-        }
+        const inputs = buildOutputInputsFromHidden(
+          hiddenNeurons,
+          outputNeuron.id
+        )
         return {
           ...outputNeuron,
-          inputs: Object.fromEntries(
-            Object.entries(inputs).map(([k, v]) => [k, Number(v) || 0])
-          ),
+          inputs,
         }
       })
     })
@@ -492,7 +600,12 @@ export function useGrandPublicActivity() {
         setHiddenNeurons((prev) =>
           prev.map((n) =>
             n.id === neuronId
-              ? { ...n, calculatedOutput: output, outputValidated: true }
+              ? {
+                  ...n,
+                  calculatedOutput: output,
+                  outputValidated: true,
+                  needsRecalculation: false,
+                }
               : n
           )
         )
@@ -500,7 +613,12 @@ export function useGrandPublicActivity() {
         setOutputNeurons((prev) =>
           prev.map((n) =>
             n.id === neuronId
-              ? { ...n, calculatedOutput: output, outputValidated: true }
+              ? {
+                  ...n,
+                  calculatedOutput: output,
+                  outputValidated: true,
+                  needsRecalculation: false,
+                }
               : n
           )
         )
@@ -525,6 +643,7 @@ export function useGrandPublicActivity() {
                   sumValidated: false,
                   calculatedOutput: null,
                   outputValidated: false,
+                  needsRecalculation: false,
                   userOutputInput: '',
                 }
               : n
@@ -540,6 +659,7 @@ export function useGrandPublicActivity() {
                   sumValidated: false,
                   calculatedOutput: null,
                   outputValidated: false,
+                  needsRecalculation: false,
                   userOutputInput: '',
                 }
               : n
@@ -717,6 +837,7 @@ export function useGrandPublicActivity() {
     computeInputs,
     autoCalculateHiddenNeurons,
     autoCalculateOutputNeurons,
+    applySeuilThreshold,
     handleValidateSum,
     handleValidateOutput,
     handleReturnToPhase1,

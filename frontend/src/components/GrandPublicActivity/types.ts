@@ -21,6 +21,8 @@ export interface NeuronData {
   userSumInput: string
   userOutputInput: string
   digit?: number
+  /** Seuil modifié en mode seuil : à revalider en mode calcul. */
+  needsRecalculation?: boolean
 }
 
 export interface NetworkVisualizationProps {

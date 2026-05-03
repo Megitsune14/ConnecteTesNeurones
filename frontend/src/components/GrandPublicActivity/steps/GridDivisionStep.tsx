@@ -4,6 +4,27 @@ interface GridDivisionStepProps {
   onNext: () => void
 }
 
+/** 3×2 cellules 48px + séparateurs 2+4+2 px entre groupes de colonnes. */
+const CELL_PX = 48
+const COL_GROUP_W = CELL_PX * 2
+const SEP_MARGIN_PX = 2
+const SEP_W_PX = 4
+const V_LINE_LEFT = [
+  COL_GROUP_W + SEP_MARGIN_PX,
+  COL_GROUP_W + SEP_MARGIN_PX * 3 + SEP_W_PX + COL_GROUP_W + SEP_MARGIN_PX,
+] as const
+const ROWS_PER_BAND = 3
+const H_BAND_PX = ROWS_PER_BAND * CELL_PX
+const H_SEP_BEFORE_PX = SEP_MARGIN_PX
+const H_LINE_TOP = [
+  H_BAND_PX + H_SEP_BEFORE_PX,
+  H_BAND_PX + (SEP_MARGIN_PX * 2 + SEP_W_PX) + H_BAND_PX + H_SEP_BEFORE_PX,
+] as const
+/** Déborde vers les labels COL (haut) / LIG (gauche) pour mieux cadrer le texte. */
+const V_EXTEND_TOP_PX = 40
+const V_EXTEND_BOTTOM_PX = 0
+const H_EXTEND_LEFT_PX = 64
+
 const GridDivisionStep = ({ pattern, onNext }: GridDivisionStepProps) => {
   return (
     <section className="bg-white border-2 border-grey rounded-2xl p-8 shadow-sm animate-fade-in-up">
@@ -17,7 +38,7 @@ const GridDivisionStep = ({ pattern, onNext }: GridDivisionStepProps) => {
         </p>
         <div className="flex flex-col items-center gap-4">
           <div className="relative inline-block">
-            <div className="border-4 border-grey rounded-2xl p-2 bg-gray-50 shadow-md relative">
+            <div className="border-4 border-grey rounded-2xl p-2 bg-gray-50 shadow-md relative overflow-visible">
               <div
                 className="absolute left-16 top-2 grid items-center"
                 style={{ gridTemplateColumns: '96px 8px 96px 8px 96px' }}
@@ -52,7 +73,36 @@ const GridDivisionStep = ({ pattern, onNext }: GridDivisionStepProps) => {
                   LIG3
                 </div>
               </div>
-              <div className="ml-14 mt-8 flex flex-col gap-0 relative">
+              <div className="relative ml-14 mt-8 flex flex-col gap-0 overflow-visible">
+                <div
+                  className="pointer-events-none absolute inset-0 z-[6] overflow-visible"
+                  aria-hidden
+                >
+                  {V_LINE_LEFT.map((left) => (
+                    <div
+                      key={`v-${left}`}
+                      className="absolute bg-red"
+                      style={{
+                        left,
+                        width: SEP_W_PX,
+                        top: -V_EXTEND_TOP_PX,
+                        height: `calc(100% + ${V_EXTEND_TOP_PX + V_EXTEND_BOTTOM_PX}px)`,
+                      }}
+                    />
+                  ))}
+                  {H_LINE_TOP.map((top) => (
+                    <div
+                      key={`h-${top}`}
+                      className="absolute bg-yellow"
+                      style={{
+                        left: -H_EXTEND_LEFT_PX,
+                        width: `calc(100% + ${H_EXTEND_LEFT_PX}px)`,
+                        top,
+                        height: SEP_W_PX,
+                      }}
+                    />
+                  ))}
+                </div>
                 {[0, 1, 2].map((ligGroup) => (
                   <div key={`lig-${ligGroup}`} className="flex flex-col gap-0">
                     {Array.from({ length: 3 }).map((_, ligRow) => {
@@ -63,7 +113,10 @@ const GridDivisionStep = ({ pattern, onNext }: GridDivisionStepProps) => {
                           className="flex gap-0 relative"
                         >
                           {[0, 1, 2].map((colGroup) => (
-                            <div key={`col-${colGroup}`} className="flex gap-0 relative">
+                            <div
+                              key={`col-${colGroup}`}
+                              className="flex gap-0 relative"
+                            >
                               <div className="flex gap-0 relative">
                                 {Array.from({ length: 2 }).map((_, colCol) => {
                                   const gridCol = colGroup * 2 + colCol
@@ -72,7 +125,10 @@ const GridDivisionStep = ({ pattern, onNext }: GridDivisionStepProps) => {
                                     <div
                                       key={`${gridRow}-${gridCol}`}
                                       className="relative border border-black/20 bg-grey/40"
-                                      style={{ width: '48px', height: '48px' }}
+                                      style={{
+                                        width: CELL_PX,
+                                        height: CELL_PX,
+                                      }}
                                     >
                                       {pixel === 1 && (
                                         <div className="absolute inset-0 bg-black border border-black/50 z-[2]" />
@@ -83,12 +139,13 @@ const GridDivisionStep = ({ pattern, onNext }: GridDivisionStepProps) => {
                               </div>
                               {colGroup < 2 && (
                                 <div
-                                  className="bg-red relative z-[5]"
+                                  className="shrink-0"
                                   style={{
-                                    width: '4px',
-                                    marginLeft: '2px',
-                                    marginRight: '2px',
+                                    width: SEP_W_PX,
+                                    marginLeft: SEP_MARGIN_PX,
+                                    marginRight: SEP_MARGIN_PX,
                                   }}
+                                  aria-hidden
                                 />
                               )}
                             </div>
@@ -98,12 +155,13 @@ const GridDivisionStep = ({ pattern, onNext }: GridDivisionStepProps) => {
                     })}
                     {ligGroup < 2 && (
                       <div
-                        className="w-full bg-yellow relative z-[5]"
+                        className="shrink-0"
                         style={{
-                          height: '4px',
-                          marginTop: '2px',
-                          marginBottom: '2px',
+                          height: SEP_W_PX,
+                          marginTop: SEP_MARGIN_PX,
+                          marginBottom: SEP_MARGIN_PX,
                         }}
+                        aria-hidden
                       />
                     )}
                   </div>

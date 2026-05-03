@@ -1,50 +1,55 @@
-/** Matrices 9 lignes × 6 colonnes pour chaque chiffre (pixels 0 ou 1). */
+/** Matrices 9 lignes × 6 colonnes (motifs « bien ») pour la reconnaissance par score. */
 export const DIGIT_PATTERNS: Record<number, number[][]> = {
   0: [
     [0, 0, 1, 1, 0, 0],
-    [0, 0, 1, 1, 0, 0],
-    [1, 1, 0, 0, 1, 1],
-    [1, 1, 0, 0, 1, 1],
-    [1, 1, 0, 0, 1, 1],
-    [1, 1, 0, 0, 1, 1],
-    [1, 1, 0, 0, 1, 1],
-    [1, 1, 0, 0, 1, 1],
+    [0, 1, 1, 1, 1, 0],
+    [0, 1, 0, 0, 1, 0],
+    [0, 1, 0, 0, 1, 0],
+    [0, 1, 0, 0, 1, 0],
+    [0, 1, 0, 0, 1, 0],
+    [0, 1, 0, 0, 1, 0],
+    [0, 1, 0, 1, 1, 0],
     [0, 0, 1, 1, 0, 0],
   ],
   3: [
-    [1, 1, 1, 1, 0, 0],
-    [1, 1, 1, 1, 0, 0],
-    [0, 0, 0, 0, 1, 1],
-    [0, 0, 0, 0, 1, 1],
-    [1, 1, 1, 1, 1, 1],
-    [1, 1, 1, 1, 1, 1],
-    [0, 0, 0, 0, 1, 1],
-    [0, 0, 0, 0, 1, 1],
-    [1, 1, 1, 1, 0, 0],
+    [0, 0, 0, 0, 0, 0],
+    [0, 1, 1, 1, 1, 0],
+    [0, 0, 0, 1, 0, 0],
+    [0, 0, 1, 1, 0, 0],
+    [0, 0, 1, 1, 0, 0],
+    [0, 0, 0, 0, 1, 0],
+    [0, 0, 0, 0, 1, 0],
+    [0, 0, 0, 0, 1, 0],
+    [0, 1, 1, 1, 1, 0],
   ],
   6: [
+    [0, 0, 0, 1, 1, 0],
     [0, 0, 1, 1, 0, 0],
-    [0, 0, 1, 1, 0, 0],
-    [1, 1, 0, 0, 1, 1],
-    [1, 1, 0, 0, 1, 1],
-    [1, 1, 1, 1, 0, 0],
-    [1, 1, 1, 1, 0, 0],
-    [1, 1, 0, 0, 1, 1],
-    [1, 1, 0, 0, 1, 1],
-    [0, 0, 1, 1, 0, 0],
+    [0, 0, 1, 0, 0, 0],
+    [0, 1, 0, 0, 0, 0],
+    [0, 1, 0, 1, 0, 0],
+    [0, 1, 1, 1, 1, 0],
+    [0, 1, 0, 0, 0, 1],
+    [0, 1, 1, 1, 1, 0],
+    [0, 0, 0, 0, 0, 0],
   ],
   9: [
     [0, 0, 1, 1, 0, 0],
-    [0, 0, 1, 1, 0, 0],
-    [1, 1, 0, 0, 1, 1],
-    [1, 1, 0, 0, 1, 1],
-    [0, 0, 1, 1, 1, 1],
-    [0, 0, 1, 1, 1, 1],
-    [0, 0, 0, 0, 1, 1],
-    [0, 0, 0, 0, 1, 1],
-    [0, 0, 1, 1, 0, 0],
+    [0, 1, 0, 1, 0, 0],
+    [0, 1, 0, 1, 1, 0],
+    [0, 1, 1, 1, 1, 0],
+    [0, 0, 0, 0, 1, 0],
+    [0, 0, 0, 0, 1, 0],
+    [0, 0, 0, 0, 1, 0],
+    [0, 0, 0, 0, 1, 0],
+    [0, 0, 1, 1, 1, 0],
   ],
 }
+
+/** Chiffres pour lesquels un motif existe (DIGIT_PATTERNS / DIGIT_EXAMPLES). */
+export const RECOGNIZED_DIGITS = Object.keys(DIGIT_PATTERNS)
+  .map((k) => Number(k))
+  .sort((a, b) => a - b) as readonly number[]
 
 const clonePattern = (pattern: number[][]): number[][] =>
   pattern.map((row) => [...row])
@@ -52,6 +57,7 @@ const clonePattern = (pattern: number[][]): number[][] =>
 const EXAMPLE_DIGITS = [0, 3, 6, 9] as const
 type ExampleDigit = (typeof EXAMPLE_DIGITS)[number]
 
+/** perfect = motif « bien », good = motif « bof » (aperçu latéral / variante imparfaite). */
 export const DIGIT_EXAMPLES: Record<
   ExampleDigit,
   {
@@ -61,39 +67,59 @@ export const DIGIT_EXAMPLES: Record<
 > = {
   0: {
     perfect: clonePattern(DIGIT_PATTERNS[0]),
-    good: (() => {
-      const grid = clonePattern(DIGIT_PATTERNS[0])
-      grid[1][1] = 0
-      grid[7][4] = 0
-      return grid
-    })(),
+    good: [
+      [0, 0, 0, 0, 0, 0],
+      [0, 0, 1, 1, 1, 0],
+      [0, 1, 0, 0, 1, 1],
+      [0, 1, 0, 0, 0, 1],
+      [0, 1, 0, 0, 0, 1],
+      [0, 1, 0, 0, 0, 1],
+      [0, 1, 0, 0, 1, 1],
+      [0, 1, 0, 0, 1, 0],
+      [0, 0, 1, 1, 0, 0],
+    ],
   },
   3: {
     perfect: clonePattern(DIGIT_PATTERNS[3]),
-    good: (() => {
-      const grid = clonePattern(DIGIT_PATTERNS[3])
-      grid[0][3] = 0
-      grid[8][2] = 0
-      return grid
-    })(),
+    good: [
+      [0, 0, 0, 0, 0, 0],
+      [0, 0, 1, 1, 0, 0],
+      [0, 0, 0, 1, 0, 0],
+      [0, 0, 0, 1, 0, 0],
+      [0, 0, 1, 0, 0, 0],
+      [0, 0, 1, 1, 1, 0],
+      [0, 0, 0, 0, 1, 0],
+      [0, 0, 0, 1, 1, 0],
+      [0, 1, 1, 1, 0, 0],
+    ],
   },
   6: {
     perfect: clonePattern(DIGIT_PATTERNS[6]),
-    good: (() => {
-      const grid = clonePattern(DIGIT_PATTERNS[6])
-      grid[2][0] = 0
-      grid[6][4] = 0
-      return grid
-    })(),
+    good: [
+      [0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 1, 1, 0],
+      [0, 0, 1, 1, 0, 0],
+      [0, 1, 1, 0, 0, 0],
+      [0, 1, 0, 0, 0, 0],
+      [0, 1, 1, 1, 1, 0],
+      [0, 1, 0, 0, 1, 0],
+      [0, 1, 0, 1, 1, 0],
+      [0, 0, 1, 1, 0, 0],
+    ],
   },
   9: {
     perfect: clonePattern(DIGIT_PATTERNS[9]),
-    good: (() => {
-      const grid = clonePattern(DIGIT_PATTERNS[9])
-      grid[3][0] = 0
-      grid[6][4] = 0
-      return grid
-    })(),
+    good: [
+      [0, 0, 1, 1, 0, 0],
+      [0, 1, 0, 0, 1, 0],
+      [0, 1, 0, 1, 1, 0],
+      [0, 1, 0, 1, 1, 0],
+      [0, 1, 1, 0, 1, 0],
+      [0, 0, 0, 0, 1, 0],
+      [0, 0, 0, 0, 1, 0],
+      [0, 0, 0, 0, 1, 0],
+      [0, 0, 1, 1, 1, 0],
+    ],
   },
 }
 

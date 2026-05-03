@@ -36,6 +36,7 @@ const GrandPublicActivity = () => {
     activeNeuron,
     userDrawnGrid,
     loadDigitExample,
+    applySeuilThreshold,
   } = useGrandPublicActivity()
 
   const [openExampleDigit, setOpenExampleDigit] = useState<number | null>(null)
@@ -152,6 +153,7 @@ const GrandPublicActivity = () => {
               finalDecision={finalDecision}
               selectedDigit={selectedDigit}
               onReset={resetToDigitSelection}
+              onApplySeuilThreshold={applySeuilThreshold}
             />
           )}
           {activeNeuronId != null && activeNeuron != null && (

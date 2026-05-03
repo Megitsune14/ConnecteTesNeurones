@@ -87,6 +87,16 @@ const CYTOSCAPE_STYLE = [
     },
   },
   {
+    selector: 'node[layer = "hidden"][warning = "true"]',
+    style: {
+      'background-color': '#F9BB12',
+      'border-color': '#E6A610',
+      'border-width': 4,
+      color: '#1A182D',
+      'background-opacity': 0.95,
+    },
+  },
+  {
     selector: 'node[layer = "output"]',
     style: {
       'background-color': '#EBEBEC',
@@ -108,6 +118,16 @@ const CYTOSCAPE_STYLE = [
       'border-color': '#008080',
       'border-width': 3,
       color: '#fff',
+      'background-opacity': 0.95,
+    },
+  },
+  {
+    selector: 'node[layer = "output"][warning = "true"]',
+    style: {
+      'background-color': '#F9BB12',
+      'border-color': '#E6A610',
+      'border-width': 4,
+      color: '#1A182D',
       'background-opacity': 0.95,
     },
   },
@@ -205,16 +225,24 @@ const NetworkVisualization = ({
 
     const hiddenNodes = NETWORK_STRUCTURE.hidden.map((id, index) => {
       const neuron = hiddenValuesMap.get(id)
-      const outputValue = neuron?.outputValidated
-        ? (neuron.calculatedOutput ?? 0)
-        : 0
-      const isValidated = neuron?.outputValidated ?? false
+      const needsWarn = neuron?.needsRecalculation === true
+      const outputValue =
+        needsWarn || (neuron?.outputValidated ?? false)
+          ? (neuron?.calculatedOutput ?? 0)
+          : 0
+      const isValidated = (neuron?.outputValidated ?? false) && !needsWarn
+      const label = needsWarn
+        ? `⚠️ Neurone ${id}\n${outputValue}`
+        : isValidated
+          ? `Neurone ${id}\n${outputValue}`
+          : `Neurone ${id}`
       return {
         data: {
           id,
-          label: isValidated ? `Neurone ${id}\n${outputValue}` : `Neurone ${id}`,
+          label,
           layer: 'hidden',
           validated: isValidated,
+          warning: needsWarn ? 'true' : 'false',
           value: outputValue,
         },
         position: {
@@ -228,22 +256,28 @@ const NetworkVisualization = ({
     const outputStartY = START_Y + ((6 - 4) / 2) * NODE_SPACING
     const outputNodes = NETWORK_STRUCTURE.output.map((id, index) => {
       const neuron = outputValuesMap.get(id)
-      const outputValue = neuron?.outputValidated
-        ? (neuron.calculatedOutput ?? 0)
-        : 0
-      const isValidated = neuron?.outputValidated ?? false
+      const needsWarn = neuron?.needsRecalculation === true
+      const outputValue =
+        needsWarn || (neuron?.outputValidated ?? false)
+          ? (neuron?.calculatedOutput ?? 0)
+          : 0
+      const isValidated = (neuron?.outputValidated ?? false) && !needsWarn
       const digit =
         neuron?.digit ??
         (parseInt(id.replace('NEURONE', ''), 10) || 0)
+      const label = needsWarn
+        ? `⚠️ Neurone ${digit}\n${outputValue}`
+        : isValidated
+          ? `Neurone ${digit}\n${outputValue}`
+          : `Neurone ${digit}`
 
       return {
         data: {
           id,
-          label: isValidated
-            ? `Neurone ${digit}\n${outputValue}`
-            : `Neurone ${digit}`,
+          label,
           layer: 'output',
           validated: isValidated,
+          warning: needsWarn ? 'true' : 'false',
           value: outputValue,
           locked: !allHiddenValidated,
         },
@@ -359,12 +393,20 @@ const NetworkVisualization = ({
         const neuron = hiddenValuesMap.get(id)
         const node = cy.getElementById(id)
         if (node.length > 0) {
-          const outputValue = neuron?.outputValidated
-            ? (neuron.calculatedOutput ?? 0)
-            : 0
-          const isValidated = neuron?.outputValidated ?? false
-          node.data('label', isValidated ? `Neurone ${id}\n${outputValue}` : `Neurone ${id}`)
+          const needsWarn = neuron?.needsRecalculation === true
+          const outputValue =
+            needsWarn || (neuron?.outputValidated ?? false)
+              ? (neuron?.calculatedOutput ?? 0)
+              : 0
+          const isValidated = (neuron?.outputValidated ?? false) && !needsWarn
+          const label = needsWarn
+            ? `⚠️ Neurone ${id}\n${outputValue}`
+            : isValidated
+              ? `Neurone ${id}\n${outputValue}`
+              : `Neurone ${id}`
+          node.data('label', label)
           node.data('validated', isValidated)
+          node.data('warning', needsWarn ? 'true' : 'false')
           node.data('value', outputValue)
         }
       }
@@ -375,17 +417,20 @@ const NetworkVisualization = ({
           neuron?.digit ??
           (parseInt(id.replace('NEURONE', ''), 10) || 0)
         if (node.length > 0) {
-          const outputValue = neuron?.outputValidated
-            ? (neuron.calculatedOutput ?? 0)
-            : 0
-          const isValidated = neuron?.outputValidated ?? false
-          node.data(
-            'label',
-            isValidated
+          const needsWarn = neuron?.needsRecalculation === true
+          const outputValue =
+            needsWarn || (neuron?.outputValidated ?? false)
+              ? (neuron?.calculatedOutput ?? 0)
+              : 0
+          const isValidated = (neuron?.outputValidated ?? false) && !needsWarn
+          const label = needsWarn
+            ? `⚠️ Neurone ${digit}\n${outputValue}`
+            : isValidated
               ? `Neurone ${digit}\n${outputValue}`
               : `Neurone ${digit}`
-          )
+          node.data('label', label)
           node.data('validated', isValidated)
+          node.data('warning', needsWarn ? 'true' : 'false')
           node.data('value', outputValue)
           node.data('locked', !allHiddenValidated)
         }

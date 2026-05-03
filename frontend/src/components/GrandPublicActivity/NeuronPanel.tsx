@@ -99,10 +99,9 @@ const NeuronPanel = ({
   for (let value = rulerMin; value <= rulerMax; value += 1) {
     rulerValues.push(value)
   }
-  const rulerRange = Math.max(1, rulerMax - rulerMin)
   const cellCount = Math.max(1, rulerValues.length)
   const clampPercent = (value: number) => Math.max(0, Math.min(100, value))
-  // Le seuil sépare les cases: la zone verte commence à la valeur du seuil.
+  // Zone verte : valeur strictement supérieure au seuil (à l’égalité, sortie ReLU = 0 → rouge).
   const thresholdPosition = clampPercent(
     ((neuron.threshold - rulerMin) / cellCount) * 100
   )
@@ -134,6 +133,22 @@ const NeuronPanel = ({
             ×
           </button>
         </div>
+
+        {neuron.needsRecalculation && (
+          <div
+            className="mb-6 flex items-start gap-3 rounded-xl border-2 border-yellow bg-yellow/15 px-4 py-3 text-darkBlue"
+            role="status"
+          >
+            <span className="text-2xl leading-none" aria-hidden>
+              ⚠️
+            </span>
+            <p className="text-sm font-semibold leading-relaxed">
+              Le seuil a été modifié en mode seuil : la sortie affichée est
+              recalculée avec le nouveau seuil. Validez à nouveau les étapes
+              ci-dessous pour confirmer.
+            </p>
+          </div>
+        )}
 
         {(!neuron.sumValidated || neuron.outputValidated) && (
         <div className="space-y-6">
@@ -344,7 +359,7 @@ const NeuronPanel = ({
                           }}
                         >
                           {rulerValues.map((value, index) => {
-                            const isGreenZone = value >= neuron.threshold
+                            const isGreenZone = value > neuron.threshold
                             return (
                               <div
                                 key={`cell-${value}-${index}`}

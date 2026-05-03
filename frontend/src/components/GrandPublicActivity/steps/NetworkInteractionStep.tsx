@@ -1,7 +1,42 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { InputNeuronData, NeuronData } from '../types'
 import NetworkVisualization from '../NetworkVisualization'
 import { NETWORK_STRUCTURE } from '../constants'
+import {
+  DIGIT_MARK_BADGE_CLASSES,
+  getReferenceMarksForHiddenNeuron,
+  getReferenceMarksForOutputNeuron,
+} from '../referenceDigitSums'
+
+/** Mini-grille « Grille de départ » : même logique que la division 9×6, cellules 28px. */
+const PREVIEW_CELL_PX = 28
+const PREVIEW_COL_GROUP_W = PREVIEW_CELL_PX * 2
+const PREVIEW_SEP_MARGIN_PX = 2
+const PREVIEW_SEP_W_PX = 3
+const PREVIEW_V_LINE_LEFT = [
+  PREVIEW_COL_GROUP_W + PREVIEW_SEP_MARGIN_PX,
+  PREVIEW_COL_GROUP_W +
+    PREVIEW_SEP_MARGIN_PX +
+    PREVIEW_SEP_W_PX +
+    PREVIEW_SEP_MARGIN_PX +
+    PREVIEW_COL_GROUP_W +
+    PREVIEW_SEP_MARGIN_PX,
+] as const
+const PREVIEW_ROWS_PER_BAND = 3
+const PREVIEW_H_BAND_PX = PREVIEW_ROWS_PER_BAND * PREVIEW_CELL_PX
+const PREVIEW_H_SEP_BEFORE_PX = PREVIEW_SEP_MARGIN_PX
+const PREVIEW_H_LINE_TOP = [
+  PREVIEW_H_BAND_PX + PREVIEW_H_SEP_BEFORE_PX,
+  PREVIEW_H_BAND_PX +
+    (PREVIEW_SEP_MARGIN_PX * 2 + PREVIEW_SEP_W_PX) +
+    PREVIEW_H_BAND_PX +
+    PREVIEW_H_SEP_BEFORE_PX,
+] as const
+/** Débords des lignes de séparation (mini-grille). Bas du rouge réduit pour rester dans le cadre. */
+const PREVIEW_V_EXTEND_TOP_PX = 36
+const PREVIEW_V_EXTEND_BOTTOM_PX = 0
+const PREVIEW_H_EXTEND_LEFT_PX = 56
+const PREVIEW_H_EXTEND_RIGHT_PX = 0
 
 interface NetworkInteractionStepProps {
   pattern: number[][] | null
@@ -14,6 +49,7 @@ interface NetworkInteractionStepProps {
   finalDecision: number | null
   selectedDigit: number | null
   onReset: () => void
+  onApplySeuilThreshold: (neuronId: string, threshold: number) => void
 }
 
 const NetworkInteractionStep = ({
@@ -27,12 +63,31 @@ const NetworkInteractionStep = ({
   finalDecision,
   selectedDigit,
   onReset,
+  onApplySeuilThreshold,
 }: NetworkInteractionStepProps) => {
   type InteractionMode = 'calcul' | 'seuil'
   type ThresholdLayer = 'hidden' | 'output'
   const [mode, setMode] = useState<InteractionMode>('calcul')
   const [thresholdLayer, setThresholdLayer] = useState<ThresholdLayer>('output')
   const [thresholdValues, setThresholdValues] = useState<Record<string, number>>({})
+  const seuilDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const scheduleApplySeuilThreshold = useCallback(
+    (neuronId: string, value: number) => {
+      if (seuilDebounceRef.current) clearTimeout(seuilDebounceRef.current)
+      seuilDebounceRef.current = setTimeout(() => {
+        seuilDebounceRef.current = null
+        onApplySeuilThreshold(neuronId, value)
+      }, 280)
+    },
+    [onApplySeuilThreshold]
+  )
+
+  useEffect(() => {
+    return () => {
+      if (seuilDebounceRef.current) clearTimeout(seuilDebounceRef.current)
+    }
+  }, [])
 
   const allCalculDone =
     hiddenNeurons.length >= NETWORK_STRUCTURE.hidden.length &&
@@ -88,7 +143,7 @@ const NetworkInteractionStep = ({
       <div className="flex justify-center">
         {pattern != null ? (
           <div className="relative inline-block">
-            <div className="border-4 border-grey rounded-2xl p-2 bg-gray-50 shadow-sm relative">
+            <div className="border-4 border-grey rounded-2xl p-2 bg-gray-50 shadow-sm relative overflow-visible">
               <div
                 className="absolute left-14 top-2 grid items-center"
                 style={{ gridTemplateColumns: '56px 7px 56px 7px 56px' }}
@@ -123,7 +178,36 @@ const NetworkInteractionStep = ({
                   LIG3
                 </div>
               </div>
-              <div className="ml-12 mt-7 flex flex-col gap-0 relative">
+              <div className="relative ml-12 mt-7 flex flex-col gap-0 overflow-visible">
+                <div
+                  className="pointer-events-none absolute inset-0 z-[6] overflow-visible"
+                  aria-hidden
+                >
+                  {PREVIEW_V_LINE_LEFT.map((left) => (
+                    <div
+                      key={`preview-v-${left}`}
+                      className="absolute bg-red"
+                      style={{
+                        left,
+                        width: PREVIEW_SEP_W_PX,
+                        top: -PREVIEW_V_EXTEND_TOP_PX,
+                        height: `calc(100% + ${PREVIEW_V_EXTEND_TOP_PX + PREVIEW_V_EXTEND_BOTTOM_PX}px)`,
+                      }}
+                    />
+                  ))}
+                  {PREVIEW_H_LINE_TOP.map((top) => (
+                    <div
+                      key={`preview-h-${top}`}
+                      className="absolute bg-yellow"
+                      style={{
+                        left: -PREVIEW_H_EXTEND_LEFT_PX,
+                        width: `calc(100% + ${PREVIEW_H_EXTEND_LEFT_PX + PREVIEW_H_EXTEND_RIGHT_PX}px)`,
+                        top,
+                        height: PREVIEW_SEP_W_PX,
+                      }}
+                    />
+                  ))}
+                </div>
                 {[0, 1, 2].map((ligGroup) => (
                   <div key={`lig-${ligGroup}`} className="flex flex-col gap-0">
                     {Array.from({ length: 3 }).map((_, ligRow) => {
@@ -140,7 +224,10 @@ const NetworkInteractionStep = ({
                                     <div
                                       key={`${gridRow}-${gridCol}`}
                                       className="relative border border-black/20 bg-grey/40"
-                                      style={{ width: '28px', height: '28px' }}
+                                      style={{
+                                        width: PREVIEW_CELL_PX,
+                                        height: PREVIEW_CELL_PX,
+                                      }}
                                     >
                                       {pixel === 1 && (
                                         <div className="absolute inset-0 bg-black border border-black/50 z-[2]" />
@@ -151,12 +238,13 @@ const NetworkInteractionStep = ({
                               </div>
                               {colGroup < 2 && (
                                 <div
-                                  className="bg-red relative z-[5]"
+                                  className="shrink-0"
                                   style={{
-                                    width: '3px',
-                                    marginLeft: '2px',
-                                    marginRight: '2px',
+                                    width: PREVIEW_SEP_W_PX,
+                                    marginLeft: PREVIEW_SEP_MARGIN_PX,
+                                    marginRight: PREVIEW_SEP_MARGIN_PX,
                                   }}
+                                  aria-hidden
                                 />
                               )}
                             </div>
@@ -166,12 +254,13 @@ const NetworkInteractionStep = ({
                     })}
                     {ligGroup < 2 && (
                       <div
-                        className="w-full bg-yellow relative z-[5]"
+                        className="shrink-0"
                         style={{
-                          height: '3px',
-                          marginTop: '2px',
-                          marginBottom: '2px',
+                          height: PREVIEW_SEP_W_PX,
+                          marginTop: PREVIEW_SEP_MARGIN_PX,
+                          marginBottom: PREVIEW_SEP_MARGIN_PX,
                         }}
+                        aria-hidden
                       />
                     )}
                   </div>
@@ -226,12 +315,46 @@ const NetworkInteractionStep = ({
               0
             )
           const thresholdValue = thresholdValues[neuron.id] ?? neuron.threshold
-          const minValue = Math.min(-8, Math.floor(Math.min(sumValue, thresholdValue) - 4))
-          const maxValue = Math.max(12, Math.ceil(Math.max(sumValue, thresholdValue) + 4))
+          const refMarks =
+            neuron.layer === 'hidden'
+              ? getReferenceMarksForHiddenNeuron(neuron.id)
+              : getReferenceMarksForOutputNeuron(neuron.id)
+          const refSums = refMarks.map((m) => m.sum)
+          const minValue = Math.min(
+            -8,
+            Math.floor(Math.min(sumValue, thresholdValue, ...refSums) - 4)
+          )
+          const maxValue = Math.max(
+            12,
+            Math.ceil(Math.max(sumValue, thresholdValue, ...refSums) + 4)
+          )
           const rulerValues = Array.from(
             { length: maxValue - minValue + 1 },
             (_, index) => minValue + index
           )
+          const displayedSum = Math.round(sumValue)
+          const cellCount = Math.max(1, rulerValues.length)
+          const clampPercent = (v: number) => Math.max(0, Math.min(100, v))
+          const thresholdPosition = clampPercent(
+            ((thresholdValue - minValue) / cellCount) * 100
+          )
+          const sumPosition = clampPercent(
+            ((displayedSum - minValue + 0.5) / cellCount) * 100
+          )
+
+          const refByRounded = new Map<number, typeof refMarks>()
+          for (const m of refMarks) {
+            const r = Math.round(m.sum)
+            const list = refByRounded.get(r) ?? []
+            list.push(m)
+            refByRounded.set(r, list)
+          }
+          for (const list of refByRounded.values()) {
+            list.sort(
+              (a, b) =>
+                a.digit - b.digit || a.variant.localeCompare(b.variant)
+            )
+          }
 
           const neuronDigit =
             neuron.digit ?? (parseInt(neuron.id.replace('NEURONE', ''), 10) || 0)
@@ -263,26 +386,74 @@ const NetworkInteractionStep = ({
                     ))}
                   </div>
 
-                  <div
-                    className="mt-1 grid border-2 border-grey rounded"
-                    style={{
-                      gridTemplateColumns: `repeat(${rulerValues.length}, 38px)`,
-                    }}
-                  >
-                    {rulerValues.map((value) => (
-                      <div
-                        key={`${neuron.id}-mid-${value}`}
-                        className={`h-10 border-r border-grey/70 last:border-r-0 ${
-                          value >= thresholdValue ? 'bg-green/20' : 'bg-red/20'
-                        }`}
-                      >
-                        {Math.round(sumValue) === value && (
-                          <div className="mx-auto mt-1 h-8 w-8 rounded border-2 border-red bg-skyBlue text-darkBlue font-bold flex items-center justify-center">
-                            {Math.round(sumValue)}
+                  <div className="relative mt-1 rounded border-2 border-grey">
+                    <div
+                      className="grid min-h-[52px] items-center bg-grey/40"
+                      style={{
+                        gridTemplateColumns: `repeat(${rulerValues.length}, 38px)`,
+                      }}
+                    >
+                      {rulerValues.map((value) => (
+                        <div
+                          key={`${neuron.id}-mid-${value}`}
+                          className={`h-full min-h-[52px] border-r border-grey/70 last:border-r-0 ${
+                            value > thresholdValue ? 'bg-green/20' : 'bg-red/20'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                    <div
+                      className="pointer-events-none absolute inset-y-0 z-20 w-[3px] bg-darkBlue"
+                      style={{
+                        left: `${thresholdPosition}%`,
+                        transform: 'translateX(-50%)',
+                      }}
+                      aria-hidden
+                    />
+                    {Array.from(refByRounded.entries()).map(
+                      ([rounded, marks]) => {
+                        const leftPct = clampPercent(
+                          ((rounded - minValue + 0.5) / cellCount) * 100
+                        )
+                        return (
+                          <div
+                            key={`${neuron.id}-dig-${rounded}`}
+                            className="pointer-events-none absolute top-1/2 z-[22] flex flex-col items-center gap-0.5"
+                            style={{
+                              left: `${leftPct}%`,
+                              transform: 'translate(-50%, -50%)',
+                            }}
+                            aria-hidden
+                          >
+                            {marks.map((m) => (
+                              <span
+                                key={`${neuron.id}-${m.digit}-${m.variant}`}
+                                className={[
+                                  'inline-flex rounded border-2 px-1 py-px text-[10px] font-bold leading-none shadow-sm',
+                                  DIGIT_MARK_BADGE_CLASSES[m.digit] ??
+                                    'border-grey bg-white text-darkBlue',
+                                ].join(' ')}
+                                title={`Chiffre ${m.digit}, motif ${
+                                  m.variant === 'p' ? 'perfect' : 'good'
+                                } (DIGIT_EXAMPLES) — somme ${m.sum}`}
+                              >
+                                {m.digit}
+                                {m.variant}
+                              </span>
+                            ))}
                           </div>
-                        )}
-                      </div>
-                    ))}
+                        )
+                      }
+                    )}
+                    <div
+                      className="pointer-events-none absolute top-1/2 z-30 h-4 w-4 -translate-y-1/2 rounded-sm border-2 border-yellow-hover bg-yellow shadow-sm"
+                      style={{
+                        left: `${sumPosition}%`,
+                        transform: 'translate(-50%, -50%)',
+                      }}
+                      title={`Somme : ${displayedSum}`}
+                      aria-label={`Position de la somme sur la règle : ${displayedSum}`}
+                    />
                   </div>
 
                   <div
@@ -303,7 +474,11 @@ const NetworkInteractionStep = ({
               <div className="mt-3 flex items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => updateThreshold(neuron.id, thresholdValue - 1)}
+                  onClick={() => {
+                    const next = thresholdValue - 1
+                    updateThreshold(neuron.id, next)
+                    onApplySeuilThreshold(neuron.id, next)
+                  }}
                   className="rounded-lg border-2 border-blue/40 px-3 py-1 text-blue font-bold hover:bg-blue/10 transition-colors"
                 >
                   -
@@ -314,12 +489,20 @@ const NetworkInteractionStep = ({
                   max={maxValue}
                   step={1}
                   value={thresholdValue}
-                  onChange={(e) => updateThreshold(neuron.id, Number(e.target.value))}
+                  onChange={(e) => {
+                    const next = Number(e.target.value)
+                    updateThreshold(neuron.id, next)
+                    scheduleApplySeuilThreshold(neuron.id, next)
+                  }}
                   className="w-full accent-blue"
                 />
                 <button
                   type="button"
-                  onClick={() => updateThreshold(neuron.id, thresholdValue + 1)}
+                  onClick={() => {
+                    const next = thresholdValue + 1
+                    updateThreshold(neuron.id, next)
+                    onApplySeuilThreshold(neuron.id, next)
+                  }}
                   className="rounded-lg border-2 border-blue/40 px-3 py-1 text-blue font-bold hover:bg-blue/10 transition-colors"
                 >
                   +
