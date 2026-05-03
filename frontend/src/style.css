@@ -1,0 +1,110 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Styles globaux. Les composants réutilisables (Button, Card, Section, Input)
+ * dans src/components/ui/ centralisent les styles des boutons, cartes, sections
+ * et champs pour garder une charte cohérente.
+ */
+
+@layer base {
+  html {
+    @apply scroll-smooth;
+  }
+
+  body {
+    @apply font-sans text-base text-astro bg-gray-100 min-h-screen flex flex-col antialiased;
+    margin: 0;
+  }
+
+  a {
+    @apply no-underline text-inherit;
+  }
+
+  h1 {
+    @apply text-darkBlue mb-4 text-2xl font-bold tracking-wide drop-shadow-sm;
+  }
+
+  h2 {
+    @apply text-darkBlue font-bold tracking-wide;
+  }
+
+  p {
+    @apply text-astro text-base leading-relaxed font-medium;
+  }
+
+  #root {
+    @apply min-h-screen flex flex-col;
+  }
+}
+
+/* Navbar & Footer gradient (jaune → vert → bleu → darkBlue) + contraste texte */
+@layer components {
+  .navbar-gradient {
+    background: linear-gradient(135deg, #F9BB12 0%, #00A19A 25%, #24A1EB 50%, #1A182D 100%);
+  }
+
+  .navbar-gradient * {
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  }
+}
+
+@layer utilities {
+  .animate-fade-in-up-delayed {
+    animation: fade-in-up 0.4s ease-out 0.15s both;
+  }
+
+  .animate-fade-in-up-delayed-more {
+    animation: fade-in-up 0.4s ease-out 0.25s both;
+  }
+
+  @keyframes fade-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-fade-in-up {
+    animation: fade-in-up 0.4s ease-out;
+  }
+
+  .animate-bandelette-appear {
+    animation: fade-in-up 0.3s ease-out both;
+  }
+
+  /* Slider (input range) - style bleu charte */
+  .slider-primary::-webkit-slider-thumb {
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #24A1EB;
+    cursor: pointer;
+    border: 2px solid #fff;
+    transition: all 0.2s ease;
+  }
+
+  .slider-primary::-webkit-slider-thumb:hover {
+    background: #117DBD;
+  }
+
+  .slider-primary::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #24A1EB;
+    cursor: pointer;
+    border: 2px solid #fff;
+    transition: all 0.2s ease;
+  }
+
+  .slider-primary::-moz-range-thumb:hover {
+    background: #117DBD;
+  }
+}
