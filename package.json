@@ -2,10 +2,6 @@
     "name": "connecte-tes-neurones",
     "version": "1.0.0",
     "private": true,
-    "workspaces": [
-        "frontend",
-        "backend"
-    ],
     "scripts": {
         "dev": "npm-run-all --parallel dev:backend dev:frontend:wait",
         "dev:install": "npm i && npm-run-all --parallel dev:backend:install dev:frontend:install:wait",
