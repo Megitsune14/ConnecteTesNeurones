@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { InputNeuronData, NeuronData } from '../types'
 import NetworkVisualization from '../NetworkVisualization'
-import { NETWORK_STRUCTURE } from '../constants'
+import { NETWORK_STRUCTURE, NEURONE_FORMULAS } from '../constants'
 import {
   DIGIT_MARK_BADGE_CLASSES,
   getReferenceMarksForHiddenNeuron,
@@ -37,6 +37,28 @@ const PREVIEW_V_EXTEND_TOP_PX = 36
 const PREVIEW_V_EXTEND_BOTTOM_PX = 0
 const PREVIEW_H_EXTEND_LEFT_PX = 56
 const PREVIEW_H_EXTEND_RIGHT_PX = 0
+
+type ParsedTerm = {
+  id: string
+  sign: 1 | -1
+}
+
+const parseFormula = (formula: string): ParsedTerm[] => {
+  if (!formula) return []
+  const tokens = formula.replace(/\s+/g, ' ').trim().split(' ')
+  const terms: ParsedTerm[] = []
+  let currentSign: 1 | -1 = 1
+  for (const token of tokens) {
+    if (token === '+') {
+      currentSign = 1
+    } else if (token === '-') {
+      currentSign = -1
+    } else if (token.length > 0) {
+      terms.push({ id: token, sign: currentSign })
+    }
+  }
+  return terms
+}
 
 interface NetworkInteractionStepProps {
   pattern: number[][] | null
@@ -358,6 +380,22 @@ const NetworkInteractionStep = ({
 
           const neuronDigit =
             neuron.digit ?? (parseInt(neuron.id.replace('NEURONE', ''), 10) || 0)
+          const formula = NEURONE_FORMULAS[neuron.id] ?? ''
+          const parsedTerms = parseFormula(formula)
+          const calcParts = parsedTerms.map((term, index) => {
+            const rawValue = Number(neuron.inputs[term.id] ?? 0)
+            const absValue = Math.abs(rawValue)
+            const prefix = index === 0 ? '' : term.sign === 1 ? ' + ' : ' - '
+            return `${prefix}${absValue}`
+          })
+          const computedFromFormula = parsedTerms.reduce((acc, term) => {
+            const rawValue = Number(neuron.inputs[term.id] ?? 0)
+            return acc + term.sign * Math.abs(rawValue)
+          }, 0)
+          const calcExpression =
+            parsedTerms.length > 0
+              ? `${calcParts.join('')} = ${computedFromFormula}`
+              : `${displayedSum}`
           const outputVerdict =
             thresholdLayer === 'output' &&
             neuron.outputValidated &&
@@ -371,6 +409,11 @@ const NetworkInteractionStep = ({
             <div key={neuron.id} className="rounded-xl border-2 border-grey p-3">
               <div className="mb-2 text-center text-darkBlue font-bold text-lg">
                 {getNeuronLabel(neuron)}
+              </div>
+              <div className="mb-3 rounded-lg border border-grey bg-gray-50 px-3 py-2 text-xs text-darkBlue">
+                <p className="font-semibold">
+                  Formule : {formula || '—'} | Calcul : {calcExpression}
+                </p>
               </div>
 
               <div className="overflow-x-auto">
