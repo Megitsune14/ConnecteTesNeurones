@@ -1,0 +1,45 @@
+- generic [ref=e4]:
+  - navigation [ref=e5]:
+    - generic [ref=e7]:
+      - button "Ouvrir le menu" [ref=e8] [cursor=pointer]
+      - link "Connecte tes neurones" [ref=e12] [cursor=pointer]:
+        - /url: /
+  - main [ref=e13]:
+    - generic [ref=e26]:
+      - heading "Connecte tes neurones" [level=1] [ref=e28]
+      - generic [ref=e30]:
+        - complementary "Chiffres de référence et reconnaissance" [ref=e496]:
+          - button "8/8" [active] [ref=e770] [cursor=pointer]:
+            - generic [ref=e498]: Chiffres
+            - generic [ref=e771]: 8/8
+        - generic [ref=e573]:
+          - button "Mode calcul" [ref=e574] [cursor=pointer]
+          - button "Mode seuil" [disabled] [ref=e575]
+        - generic [ref=e577]:
+          - generic [ref=e579]:
+            - heading "Grille de départ" [level=2] [ref=e580]
+            - generic [ref=e583]:
+              - generic [ref=e584]:
+                - generic [ref=e585]: COL1
+                - generic [ref=e586]: COL2
+                - generic [ref=e587]: COL3
+              - generic:
+                - generic [ref=e588]: LIG1
+                - generic [ref=e589]: LIG2
+                - generic [ref=e590]: LIG3
+          - generic [ref=e749]:
+            - heading "Réseau de neurones" [level=2] [ref=e750]
+            - generic [ref=e751]:
+              - paragraph [ref=e752]: Cliquez sur un neurone caché (A-F) puis de sortie (0, 3, 6, 9) pour effectuer les calculs. Les neurones validés apparaissent en vert avec leur valeur de sortie.
+              - generic [ref=e758]:
+                - paragraph [ref=e759]: Validez d’abord tous les neurones cachés (A à F) pour débloquer les neurones de sortie (0, 3, 6, 9).
+                - generic [ref=e760]:
+                  - button "Calculer neurones cachés" [ref=e761] [cursor=pointer]
+                  - button "Calculer neurones de sortie" [disabled] [ref=e762]
+          - generic [ref=e765]:
+            - heading "Décision finale" [level=2] [ref=e766]
+            - paragraph [ref=e767]: Validez les neurones de sortie pour afficher le résultat.
+        - button "Tester un nouveau chiffre" [ref=e769] [cursor=pointer]
+      - button "← Retour" [ref=e103] [cursor=pointer]
+  - contentinfo [ref=e104]:
+    - generic [ref=e105]: © 2026 Connecte tes neurones. Tous droits réservés.

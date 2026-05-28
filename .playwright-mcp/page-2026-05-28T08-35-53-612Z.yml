@@ -1,0 +1,74 @@
+- generic [ref=e4]:
+  - navigation [ref=e5]:
+    - generic [ref=e7]:
+      - button "Ouvrir le menu" [ref=e8] [cursor=pointer]
+      - link "Connecte tes neurones" [ref=e12] [cursor=pointer]:
+        - /url: /
+  - main [ref=e13]:
+    - generic [ref=e26]:
+      - heading "Connecte tes neurones" [level=1] [ref=e28]
+      - generic [ref=e298]:
+        - generic [ref=e299]:
+          - heading "Comptage des pixels" [level=2] [ref=e300]
+          - button "Compter automatiquement" [active] [ref=e301] [cursor=pointer]
+        - generic [ref=e302]:
+          - paragraph [ref=e303]: Comptez le nombre de pixels noirs dans chaque bandelette et entrez les valeurs.
+          - generic [ref=e304]:
+            - generic [ref=e305]:
+              - generic [ref=e306]:
+                - heading "COL1" [level=4] [ref=e307]
+                - paragraph [ref=e308]: Colonne 1 - 2×9 pixels
+                - paragraph [ref=e309]: Comptez les pixels (noirs)
+              - generic [ref=e333]:
+                - text: "Nombre de pixels noirs :"
+                - spinbutton [ref=e334]: "2"
+                - generic [ref=e488]: ✓ Correct !
+            - generic [ref=e335]:
+              - generic [ref=e336]:
+                - heading "COL2" [level=4] [ref=e337]
+                - paragraph [ref=e338]: Colonne 2 - 2×9 pixels
+                - paragraph [ref=e339]: Comptez les pixels (noirs)
+              - generic [ref=e363]:
+                - text: "Nombre de pixels noirs :"
+                - spinbutton [ref=e364]: "9"
+                - generic [ref=e489]: ✓ Correct !
+            - generic [ref=e365]:
+              - generic [ref=e366]:
+                - heading "COL3" [level=4] [ref=e367]
+                - paragraph [ref=e368]: Colonne 3 - 2×9 pixels
+                - paragraph [ref=e369]: Comptez les pixels (noirs)
+              - generic [ref=e393]:
+                - text: "Nombre de pixels noirs :"
+                - spinbutton [ref=e394]: "5"
+                - generic [ref=e490]: ✓ Correct !
+            - generic [ref=e395]:
+              - generic [ref=e396]:
+                - heading "LIG1" [level=4] [ref=e397]
+                - paragraph [ref=e398]: Ligne 1 - 6×3 pixels
+                - paragraph [ref=e399]: Comptez les pixels (noirs)
+              - generic [ref=e424]:
+                - text: "Nombre de pixels noirs :"
+                - spinbutton [ref=e425]: "5"
+                - generic [ref=e491]: ✓ Correct !
+            - generic [ref=e426]:
+              - generic [ref=e427]:
+                - heading "LIG2" [level=4] [ref=e428]
+                - paragraph [ref=e429]: Ligne 2 - 6×3 pixels
+                - paragraph [ref=e430]: Comptez les pixels (noirs)
+              - generic [ref=e455]:
+                - text: "Nombre de pixels noirs :"
+                - spinbutton [ref=e456]: "5"
+                - generic [ref=e492]: ✓ Correct !
+            - generic [ref=e457]:
+              - generic [ref=e458]:
+                - heading "LIG3" [level=4] [ref=e459]
+                - paragraph [ref=e460]: Ligne 3 - 6×3 pixels
+                - paragraph [ref=e461]: Comptez les pixels (noirs)
+              - generic [ref=e486]:
+                - text: "Nombre de pixels noirs :"
+                - spinbutton [ref=e487]: "6"
+                - generic [ref=e493]: ✓ Correct !
+          - button "Voir le réseau de neurones" [ref=e495] [cursor=pointer]
+      - button "← Retour" [ref=e103] [cursor=pointer]
+  - contentinfo [ref=e104]:
+    - generic [ref=e105]: © 2026 Connecte tes neurones. Tous droits réservés.
