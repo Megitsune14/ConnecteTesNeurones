@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useGrandPublicActivity } from './useGrandPublicActivity'
+import { useGame } from './useGame'
 import NeuronPanel from './NeuronPanel'
 import DigitSelectionStep from './steps/DigitSelectionStep'
 import GridDivisionStep from './steps/GridDivisionStep'
 import PixelCountingStep from './steps/PixelCountingStep'
 import NetworkInteractionStep from './steps/NetworkInteractionStep'
 
-const GrandPublicActivity = () => {
+const Game = () => {
   const navigate = useNavigate()
   const {
     currentStep,
@@ -37,7 +37,7 @@ const GrandPublicActivity = () => {
     userDrawnGrid,
     loadDigitExample,
     applySeuilThreshold,
-  } = useGrandPublicActivity()
+  } = useGame()
 
   const [openExampleDigit, setOpenExampleDigit] = useState<number | null>(null)
 
@@ -186,4 +186,4 @@ const GrandPublicActivity = () => {
   )
 }
 
-export default GrandPublicActivity
+export default Game
