@@ -1,7 +1,7 @@
 import { Routes, Route } from 'react-router-dom'
 import Layout from './components/Layout'
 import { HomePage } from './pages'
-import GrandPublicActivity from './components/GrandPublicActivity'
+import Game from './components/Game'
 
 function App() {
   return (
@@ -9,7 +9,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<HomePage />} />
-          <Route path="solo/grand-public" element={<GrandPublicActivity />} />
+          <Route path="game" element={<Game />} />
         </Route>
       </Routes>
     </div>

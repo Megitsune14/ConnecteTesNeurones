@@ -131,12 +131,12 @@ function cascadeInvalidateOutputs(
   })
 }
 
-const STORAGE_KEY_STEP = 'grandPublicStep'
-const STORAGE_KEY_DRAWN_GRID = 'grandPublicDrawnGrid'
-const STORAGE_KEY_SELECTED_DIGIT = 'grandPublicSelectedDigit'
-const STORAGE_KEY_USER_COUNTS = 'grandPublicUserCounts'
-const STORAGE_KEY_HIDDEN_NEURONS = 'grandPublicHiddenNeurons'
-const STORAGE_KEY_OUTPUT_NEURONS = 'grandPublicOutputNeurons'
+const STORAGE_KEY_STEP = 'gameStep'
+const STORAGE_KEY_DRAWN_GRID = 'gameDrawnGrid'
+const STORAGE_KEY_SELECTED_DIGIT = 'gameSelectedDigit'
+const STORAGE_KEY_USER_COUNTS = 'gameUserCounts'
+const STORAGE_KEY_HIDDEN_NEURONS = 'gameHiddenNeurons'
+const STORAGE_KEY_OUTPUT_NEURONS = 'gameOutputNeurons'
 
 const STEPS_ORDER: ProgressStep[] = [
   'digit-selection',
@@ -242,7 +242,7 @@ function loadOutputNeurons(): NeuronData[] {
   }
 }
 
-export function useGrandPublicActivity() {
+export function useGame() {
   const [currentStep, setCurrentStep] = useState<ProgressStep>(loadStep)
   const [userDrawnGrid, setUserDrawnGrid] = useState<number[][] | null>(loadDrawnGrid)
   const [selectedDigit, setSelectedDigit] = useState<number | null>(loadSelectedDigit)
