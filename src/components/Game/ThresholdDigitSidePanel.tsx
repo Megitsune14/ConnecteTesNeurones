@@ -1,31 +1,79 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { RECOGNIZED_DIGITS } from './constants'
+import MiniDigitGrid from './MiniDigitGrid'
 import {
   computeAllDigitRecognitions,
+  computeCurrentGridRecognition,
   DIGIT_MARK_BADGE_CLASSES,
+  type DigitRecognitionResult,
   type DigitVariantTag,
 } from './referenceDigitSums'
+import type { SessionDigitEntry } from './sessionDigits'
 
 interface ThresholdDigitSidePanelProps {
   thresholdValues: Record<string, number>
+  pattern?: number[][] | null
+  selectedDigit?: number | null
+  sessionDigits: SessionDigitEntry[]
+  onSaveCurrent: () => void
+  onRemoveSessionDigit: (id: string) => void
+  /** Contrôle l’état ouvert / replié (ex. déplié en mode seuil, replié en mode calcul). */
+  defaultOpen?: boolean
 }
 
 const VARIANT_LABELS: Record<DigitVariantTag, string> = {
   p: 'Parfait',
   g: 'Bien dessiné',
+  current: 'Chiffre en cours',
+  s: 'Session',
+}
+
+function recognitionStatusLabel(result: DigitRecognitionResult): string {
+  if (result.isRecognized) return `Reconnu comme ${result.digit}`
+  if (result.recognizedDigit === null) return 'Non reconnu'
+  return `Confondu avec ${result.recognizedDigit}`
 }
 
 const ThresholdDigitSidePanel = ({
   thresholdValues,
+  pattern = null,
+  selectedDigit = null,
+  sessionDigits,
+  onSaveCurrent,
+  onRemoveSessionDigit,
+  defaultOpen = false,
 }: ThresholdDigitSidePanelProps) => {
-  const [isOpen, setIsOpen] = useState(false)
+  const [isOpen, setIsOpen] = useState(defaultOpen)
+
+  useEffect(() => {
+    setIsOpen(defaultOpen)
+  }, [defaultOpen])
 
   const recognitions = useMemo(
-    () => computeAllDigitRecognitions(thresholdValues),
-    [thresholdValues]
+    () => computeAllDigitRecognitions(thresholdValues, sessionDigits),
+    [thresholdValues, sessionDigits]
+  )
+
+  const sessionRecognitions = useMemo(
+    () => recognitions.filter((r) => r.variant === 's'),
+    [recognitions]
+  )
+
+  const currentRecognition = useMemo(
+    () =>
+      pattern != null
+        ? computeCurrentGridRecognition(
+            thresholdValues,
+            pattern,
+            selectedDigit
+          )
+        : null,
+    [thresholdValues, pattern, selectedDigit]
   )
 
   const recognizedCount = recognitions.filter((r) => r.isRecognized).length
+  const allReferencesOk = recognizedCount === recognitions.length
+  const canSaveCurrent = pattern != null && selectedDigit != null
 
   return (
     <aside
@@ -73,7 +121,7 @@ const ThresholdDigitSidePanel = ({
             </span>
             <span
               className={`max-md:mt-0 md:mt-2 inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-[10px] font-bold ${
-                recognizedCount === recognitions.length
+                allReferencesOk
                   ? 'bg-green/20 text-green'
                   : recognizedCount === 0
                     ? 'bg-red/15 text-red'
@@ -88,12 +136,162 @@ const ThresholdDigitSidePanel = ({
 
       {isOpen && (
         <div className="max-h-[calc(100vh-8rem)] overflow-y-auto px-3 py-3">
+          {!allReferencesOk && (
+            <div
+              className="mb-3 rounded-lg border border-red/40 bg-red/5 px-2.5 py-2 text-xs font-semibold text-red"
+              role="alert"
+            >
+              Certains chiffres de référence ne sont plus reconnus avec les
+              seuils actuels.
+            </div>
+          )}
+
           <p className="mb-3 text-xs font-medium leading-relaxed text-astro">
             Suivi en temps réel
           </p>
+
+          {currentRecognition != null && pattern != null && (
+            <div className="mb-4 rounded-xl border-2 border-darkBlue/30 bg-blue/5 p-2.5">
+              <p className="mb-2 text-xs font-bold uppercase tracking-wide text-darkBlue">
+                Chiffre en cours
+              </p>
+              <div
+                className={[
+                  'rounded-lg border px-2.5 py-2 text-xs',
+                  currentRecognition.isRecognized
+                    ? 'border-green/50 bg-green/10'
+                    : currentRecognition.recognizedDigit === null
+                      ? 'border-grey bg-white'
+                      : 'border-red/40 bg-red/5',
+                ].join(' ')}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <MiniDigitGrid
+                    pattern={pattern}
+                    cellPx={4}
+                    aria-label={`Dessin du chiffre en cours${selectedDigit != null ? ` (${selectedDigit})` : ''}`}
+                  />
+                  <span
+                    className={`shrink-0 font-semibold ${
+                      currentRecognition.isRecognized
+                        ? 'text-green'
+                        : currentRecognition.recognizedDigit === null
+                          ? 'text-astro'
+                          : 'text-red'
+                    }`}
+                  >
+                    {currentRecognition.isRecognized
+                      ? '✓'
+                      : currentRecognition.recognizedDigit === null
+                        ? '—'
+                        : `→ ${currentRecognition.recognizedDigit}`}
+                  </span>
+                </div>
+                <p
+                  className={`mt-2 font-semibold ${
+                    currentRecognition.isRecognized
+                      ? 'text-green'
+                      : currentRecognition.recognizedDigit === null
+                        ? 'text-astro'
+                        : 'text-red'
+                  }`}
+                >
+                  {currentRecognition.isRecognized
+                    ? `Reconnu comme ${selectedDigit}`
+                    : currentRecognition.recognizedDigit === null
+                      ? 'Non reconnu'
+                      : `Confondu avec ${currentRecognition.recognizedDigit}`}
+                </p>
+                <button
+                  type="button"
+                  onClick={onSaveCurrent}
+                  disabled={!canSaveCurrent}
+                  className="mt-2 w-full rounded-lg border-2 border-blue bg-white px-3 py-1.5 text-xs font-semibold text-blue transition-colors hover:bg-blue/10 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Sauvegarder dans la session
+                </button>
+              </div>
+            </div>
+          )}
+
+          {sessionRecognitions.length > 0 && (
+            <div className="mb-4 rounded-xl border border-grey bg-gray-50/80 p-2.5">
+              <p className="mb-2 text-xs font-bold uppercase tracking-wide text-darkBlue">
+                Chiffres de la session
+              </p>
+              <ul className="space-y-2">
+                {sessionRecognitions.map((result) => {
+                  const entry = sessionDigits.find((e) => e.id === result.sessionId)
+                  if (!entry) return null
+                  return (
+                    <li
+                      key={result.sessionId}
+                      className={[
+                        'rounded-lg border px-2.5 py-2 text-xs',
+                        result.isRecognized
+                          ? 'border-green/50 bg-green/10'
+                          : result.recognizedDigit === null
+                            ? 'border-grey bg-white'
+                            : 'border-red/40 bg-red/5',
+                      ].join(' ')}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <MiniDigitGrid
+                          pattern={entry.grid}
+                          cellPx={4}
+                          aria-label={`Dessin session — chiffre ${entry.digit}`}
+                        />
+                        <div className="flex shrink-0 flex-col items-end gap-1">
+                          <span
+                            className={`font-semibold ${
+                              result.isRecognized
+                                ? 'text-green'
+                                : result.recognizedDigit === null
+                                  ? 'text-astro'
+                                  : 'text-red'
+                            }`}
+                          >
+                            {result.isRecognized
+                              ? '✓'
+                              : result.recognizedDigit === null
+                                ? '—'
+                                : `→ ${result.recognizedDigit}`}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => onRemoveSessionDigit(entry.id)}
+                            className="text-[10px] font-medium text-astro underline hover:text-red"
+                          >
+                            Retirer
+                          </button>
+                        </div>
+                      </div>
+                      <p className="mt-1.5 font-medium text-astro">
+                        {VARIANT_LABELS.s} — attendu {entry.digit}
+                      </p>
+                      <p
+                        className={`mt-0.5 font-semibold ${
+                          result.isRecognized
+                            ? 'text-green'
+                            : result.recognizedDigit === null
+                              ? 'text-astro'
+                              : 'text-red'
+                        }`}
+                      >
+                        {recognitionStatusLabel(result)}
+                      </p>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          )}
+
           <div className="space-y-4">
             {RECOGNIZED_DIGITS.map((digit) => {
-              const digitResults = recognitions.filter((r) => r.digit === digit)
+              const digitResults = recognitions.filter(
+                (r) => r.digit === digit && (r.variant === 'p' || r.variant === 'g')
+              )
               const digitOk = digitResults.every((r) => r.isRecognized)
               return (
                 <div
@@ -172,11 +370,7 @@ const ThresholdDigitSidePanel = ({
                                 : 'text-red'
                           }`}
                         >
-                          {result.isRecognized
-                            ? `Reconnu comme ${result.digit}`
-                            : result.recognizedDigit === null
-                              ? 'Non reconnu'
-                              : `Confondu avec ${result.recognizedDigit}`}
+                          {recognitionStatusLabel(result)}
                         </p>
                       </li>
                     ))}

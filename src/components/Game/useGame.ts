@@ -716,6 +716,65 @@ export function useGame() {
     setFinalDecision(resolveWinningDigit(activations))
   }, [outputNeurons])
 
+  const resetThresholdsToDefaults = useCallback(() => {
+    const anyHiddenToReset = hiddenNeurons.some((n) => {
+      const t =
+        NETWORK_STRUCTURE.hiddenThresholds[
+          n.id as keyof typeof NETWORK_STRUCTURE.hiddenThresholds
+        ] ?? 0
+      return n.threshold !== t
+    })
+    const anyOutputToReset = outputNeurons.some((n) => {
+      const t =
+        NETWORK_STRUCTURE.outputThresholds[
+          n.id as keyof typeof NETWORK_STRUCTURE.outputThresholds
+        ] ?? 0
+      return n.threshold !== t
+    })
+    if (!anyHiddenToReset && !anyOutputToReset) return
+
+    setFinalDecision(null)
+    setHiddenNeurons((prevH) => {
+      let nextH = prevH
+      let anyHiddenChanged = false
+      for (const id of NETWORK_STRUCTURE.hidden) {
+        const t = NETWORK_STRUCTURE.hiddenThresholds[id] ?? 0
+        const current = nextH.find((n) => n.id === id)
+        if (!current || current.threshold === t) continue
+        anyHiddenChanged = true
+        nextH = applyHiddenThresholdMap(nextH, id, t)
+      }
+      setOutputNeurons((prevO) => {
+        let nextO = anyHiddenChanged
+          ? cascadeInvalidateOutputs(nextH, prevO)
+          : prevO.map((outputNeuron) => ({
+              ...outputNeuron,
+              inputs: buildOutputInputsFromHidden(nextH, outputNeuron.id),
+            }))
+        return nextO.map((n) => {
+          const t =
+            NETWORK_STRUCTURE.outputThresholds[
+              n.id as keyof typeof NETWORK_STRUCTURE.outputThresholds
+            ] ?? 0
+          if (n.threshold === t) return n
+          const nextCalcOut =
+            n.calculatedSum != null
+              ? Math.max(0, n.calculatedSum - t)
+              : n.calculatedOutput
+          return {
+            ...n,
+            threshold: t,
+            calculatedOutput: nextCalcOut ?? null,
+            outputValidated: false,
+            needsRecalculation: true,
+            userOutputInput: '',
+          }
+        })
+      })
+      return nextH
+    })
+  }, [hiddenNeurons, outputNeurons])
+
   const resetToDigitSelection = useCallback(() => {
     setSelectedDigit(null)
     setUserDrawnGrid(null)
@@ -836,6 +895,7 @@ export function useGame() {
     autoCalculateHiddenNeurons,
     autoCalculateOutputNeurons,
     applySeuilThreshold,
+    resetThresholdsToDefaults,
     handleValidateSum,
     handleValidateOutput,
     handleReturnToPhase1,

@@ -1,5 +1,10 @@
 import { Link } from 'react-router-dom'
 import { Section } from '../components/ui'
+import logoMmi from '../assets/logo_mmi.png'
+
+const MMI_URL = 'https://mmi.universite-lyon.fr/'
+const ATELIER_URL =
+  'https://mmi.universite-lyon.fr/pour-les-scolaires/ressources-pedagogiques-et-de-mediation/connecte-tes-neurones-385696.kjsp'
 
 const HomePage = () => {
   return (
@@ -34,6 +39,49 @@ const HomePage = () => {
           >
             Jouer
           </Link>
+        </div>
+      </Section>
+
+      <Section className="mt-8">
+        <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-start sm:gap-8">
+          <a
+            href={MMI_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex shrink-0 rounded-xl border border-grey bg-white p-4 shadow-sm transition-opacity hover:opacity-90"
+          >
+            <img
+              src={logoMmi}
+              alt="Maison des mathématiques et de l'informatique"
+              className="h-16 w-auto object-contain sm:h-20"
+            />
+          </a>
+          <div className="text-astro text-center text-sm font-medium leading-relaxed sm:text-left sm:text-base">
+            <p>
+              Cet atelier{' '}
+              <strong className="text-darkBlue">Connecte tes neurones</strong>{' '}
+              a été créé et proposé par la{' '}
+              <a
+                href={MMI_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-blue underline underline-offset-2 hover:text-blue-hover"
+              >
+                MMI
+              </a>{' '}
+              — Maison des mathématiques et de l&apos;informatique.
+            </p>
+            <p className="mt-2">
+              <a
+                href={ATELIER_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-blue underline underline-offset-2 hover:text-blue-hover"
+              >
+                Voir la fiche atelier sur le site de la MMI
+              </a>
+            </p>
+          </div>
         </div>
       </Section>
     </div>

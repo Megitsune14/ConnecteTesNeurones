@@ -8,6 +8,8 @@ import {
   getReferenceMarksForOutputNeuron,
 } from '../referenceDigitSums'
 import ThresholdDigitSidePanel from '../ThresholdDigitSidePanel'
+import MiniDigitGrid from '../MiniDigitGrid'
+import { useSessionDigits } from '../sessionDigits'
 import {
   getOutputVerdictLabel,
   resolveWinningDigit,
@@ -44,31 +46,6 @@ const PREVIEW_V_EXTEND_BOTTOM_PX = 0
 const PREVIEW_H_EXTEND_LEFT_PX = 56
 const PREVIEW_H_EXTEND_RIGHT_PX = 0
 
-/** Grille 9×6 miniature pour le marqueur de somme sur la règlette mode seuil. */
-const RULER_MINI_CELL_PX = 2
-
-const MiniDigitGrid = ({ pattern }: { pattern: number[][] }) => (
-  <div
-    className="inline-flex flex-col gap-px rounded border border-grey/80 bg-grey p-0.5 shadow-sm"
-    aria-hidden
-  >
-    {pattern.map((row, rowIndex) => (
-      <div key={rowIndex} className="flex gap-px">
-        {row.map((pixel, colIndex) => (
-          <div
-            key={`${rowIndex}-${colIndex}`}
-            className={pixel === 1 ? 'bg-black' : 'bg-grey/60'}
-            style={{
-              width: RULER_MINI_CELL_PX,
-              height: RULER_MINI_CELL_PX,
-            }}
-          />
-        ))}
-      </div>
-    ))}
-  </div>
-)
-
 type ParsedTerm = {
   id: string
   sign: 1 | -1
@@ -103,6 +80,7 @@ interface NetworkInteractionStepProps {
   selectedDigit: number | null
   onReset: () => void
   onApplySeuilThreshold: (neuronId: string, threshold: number) => void
+  onResetThresholds: () => void
 }
 
 const NetworkInteractionStep = ({
@@ -117,9 +95,11 @@ const NetworkInteractionStep = ({
   selectedDigit,
   onReset,
   onApplySeuilThreshold,
+  onResetThresholds,
 }: NetworkInteractionStepProps) => {
   type InteractionMode = 'calcul' | 'seuil'
   type ThresholdLayer = 'hidden' | 'output'
+  const { sessionDigits, saveDigit, removeDigit } = useSessionDigits()
   const [mode, setMode] = useState<InteractionMode>('calcul')
   const [thresholdLayer, setThresholdLayer] = useState<ThresholdLayer>('output')
   const [thresholdValues, setThresholdValues] = useState<Record<string, number>>({})
@@ -197,6 +177,23 @@ const NetworkInteractionStep = ({
       ...prev,
       [neuronId]: Math.round(nextValue),
     }))
+  }
+
+  const handleResetThresholds = () => {
+    onResetThresholds()
+    const defaults: Record<string, number> = {}
+    for (const id of NETWORK_STRUCTURE.hidden) {
+      defaults[id] = NETWORK_STRUCTURE.hiddenThresholds[id] ?? 0
+    }
+    for (const id of NETWORK_STRUCTURE.output) {
+      defaults[id] = NETWORK_STRUCTURE.outputThresholds[id] ?? 0
+    }
+    setThresholdValues(defaults)
+  }
+
+  const handleSaveCurrentDigit = () => {
+    if (pattern == null || selectedDigit == null) return
+    saveDigit(selectedDigit, pattern)
   }
 
   const beforePanel = (
@@ -342,31 +339,40 @@ const NetworkInteractionStep = ({
   )
 
   const thresholdPanel = (
-    <section className="bg-white border-2 border-grey rounded-2xl p-6 shadow-sm animate-fade-in-up">
-      <div className="mb-5 flex justify-center gap-3">
+    <section className="bg-white border-2 border-grey rounded-2xl p-4 sm:p-6 shadow-sm animate-fade-in-up">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+        <div className="flex flex-wrap justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => setThresholdLayer('hidden')}
+            className={[
+              'rounded-xl px-4 sm:px-5 py-2 text-sm font-semibold transition-colors border-2 min-h-11',
+              thresholdLayer === 'hidden'
+                ? 'bg-blue text-white border-blue hover:bg-blue-hover'
+                : 'bg-white text-blue border-blue/30 hover:bg-blue/10',
+            ].join(' ')}
+          >
+            Neurones cachés
+          </button>
+          <button
+            type="button"
+            onClick={() => setThresholdLayer('output')}
+            className={[
+              'rounded-xl px-4 sm:px-5 py-2 text-sm font-semibold transition-colors border-2 min-h-11',
+              thresholdLayer === 'output'
+                ? 'bg-blue text-white border-blue hover:bg-blue-hover'
+                : 'bg-white text-blue border-blue/30 hover:bg-blue/10',
+            ].join(' ')}
+          >
+            Neurones de sortie
+          </button>
+        </div>
         <button
           type="button"
-          onClick={() => setThresholdLayer('hidden')}
-          className={[
-            'rounded-xl px-5 py-2 text-sm font-semibold transition-colors border-2',
-            thresholdLayer === 'hidden'
-              ? 'bg-blue text-white border-blue hover:bg-blue-hover'
-              : 'bg-white text-blue border-blue/30 hover:bg-blue/10',
-          ].join(' ')}
+          onClick={handleResetThresholds}
+          className="rounded-xl border-2 border-blue/40 bg-white px-4 py-2 text-sm font-semibold text-blue transition-colors hover:bg-blue/10 min-h-11"
         >
-          Neurones cachés
-        </button>
-        <button
-          type="button"
-          onClick={() => setThresholdLayer('output')}
-          className={[
-            'rounded-xl px-5 py-2 text-sm font-semibold transition-colors border-2',
-            thresholdLayer === 'output'
-              ? 'bg-blue text-white border-blue hover:bg-blue-hover'
-              : 'bg-white text-blue border-blue/30 hover:bg-blue/10',
-          ].join(' ')}
-        >
-          Neurones de sortie
+          Remettre les seuils par défaut
         </button>
       </div>
 
@@ -387,8 +393,19 @@ const NetworkInteractionStep = ({
           const thresholdValue = thresholdValues[neuron.id] ?? neuron.threshold
           const refMarks =
             neuron.layer === 'hidden'
-              ? getReferenceMarksForHiddenNeuron(neuron.id)
-              : getReferenceMarksForOutputNeuron(neuron.id)
+              ? getReferenceMarksForHiddenNeuron(
+                  neuron.id,
+                  pattern,
+                  selectedDigit,
+                  sessionDigits
+                )
+              : getReferenceMarksForOutputNeuron(
+                  neuron.id,
+                  pattern,
+                  selectedDigit,
+                  effectiveThresholds,
+                  sessionDigits
+                )
           const refSums = refMarks.map((m) => m.sum)
           const minValue = Math.min(
             -8,
@@ -503,9 +520,7 @@ const NetworkInteractionStep = ({
                     />
                     {rulerMarkerPositions.map((rounded) => {
                       const marks = refByRounded.get(rounded) ?? []
-                      const showCurrentDigit =
-                        pattern != null && displayedSum === rounded
-                      if (marks.length === 0 && !showCurrentDigit) return null
+                      if (marks.length === 0) return null
 
                       const leftPct = clampPercent(
                         ((rounded - minValue + 0.5) / cellCount) * 100
@@ -518,32 +533,34 @@ const NetworkInteractionStep = ({
                             left: `${leftPct}%`,
                             transform: 'translate(-50%, -50%)',
                           }}
-                          aria-hidden={!showCurrentDigit}
-                          {...(showCurrentDigit
-                            ? {
-                                title: `Somme : ${displayedSum}`,
-                                'aria-label': `Chiffre en cours — somme ${displayedSum} sur la règle`,
-                              }
-                            : {})}
                         >
-                          {marks.map((m) => (
-                            <span
-                              key={`${neuron.id}-${m.digit}-${m.variant}`}
-                              className={[
-                                'inline-flex rounded border-2 px-1 py-px text-[10px] font-bold leading-none shadow-sm',
-                                DIGIT_MARK_BADGE_CLASSES[m.digit] ??
-                                  'border-grey bg-white text-darkBlue',
-                              ].join(' ')}
-                              title={`Chiffre ${m.digit}, motif ${
-                                m.variant === 'p' ? 'perfect' : 'good'
-                              } (DIGIT_EXAMPLES) — somme ${m.sum}`}
-                            >
-                              {m.digit}
-                              {m.variant}
-                            </span>
-                          ))}
-                          {showCurrentDigit && (
-                            <MiniDigitGrid pattern={pattern} />
+                          {marks.map((m) =>
+                            (m.variant === 'current' || m.variant === 's') &&
+                            m.grid != null ? (
+                              <MiniDigitGrid
+                                key={
+                                  m.sessionId
+                                    ? `${neuron.id}-session-${m.sessionId}`
+                                    : `${neuron.id}-current-${rounded}`
+                                }
+                                pattern={m.grid}
+                              />
+                            ) : m.variant === 'p' || m.variant === 'g' ? (
+                              <span
+                                key={`${neuron.id}-${m.digit}-${m.variant}`}
+                                className={[
+                                  'inline-flex rounded border-2 px-1 py-px text-[10px] font-bold leading-none shadow-sm',
+                                  DIGIT_MARK_BADGE_CLASSES[m.digit] ??
+                                    'border-grey bg-white text-darkBlue',
+                                ].join(' ')}
+                                title={`Chiffre ${m.digit}, motif ${
+                                  m.variant === 'p' ? 'perfect' : 'good'
+                                } (DIGIT_EXAMPLES) — somme ${m.sum}`}
+                              >
+                                {m.digit}
+                                {m.variant}
+                              </span>
+                            ) : null
                           )}
                         </div>
                       )
@@ -621,7 +638,15 @@ const NetworkInteractionStep = ({
 
   return (
     <>
-      <ThresholdDigitSidePanel thresholdValues={effectiveThresholds} />
+      <ThresholdDigitSidePanel
+        thresholdValues={effectiveThresholds}
+        pattern={pattern}
+        selectedDigit={selectedDigit}
+        sessionDigits={sessionDigits}
+        onSaveCurrent={handleSaveCurrentDigit}
+        onRemoveSessionDigit={removeDigit}
+        defaultOpen={mode === 'seuil'}
+      />
       <div className="md:ml-11 min-w-0">
       <div className="mb-6 flex flex-wrap justify-center gap-3">
         <button
@@ -655,15 +680,15 @@ const NetworkInteractionStep = ({
         </button>
       </div>
       <div className="w-full min-w-0 overflow-x-auto pb-2">
-        <div className="flex w-full min-w-0 max-w-full flex-col items-stretch gap-8 lg:flex-row lg:items-start lg:gap-4 min-[1930px]:gap-6">
+        <div className="flex w-full min-w-0 max-w-full flex-col items-stretch gap-6 lg:flex-row lg:items-start lg:gap-4 xl:gap-6">
           {mode === 'calcul' ? (
-            <div className="mx-auto w-full max-w-[360px] lg:mx-0 lg:w-[280px] lg:shrink-0 xl:w-[320px] min-[1800px]:w-[360px] min-[1800px]:max-w-[360px] lg:pt-8 min-[1800px]:pt-[120px]">
+            <div className="mx-auto w-full max-w-[360px] lg:mx-0 lg:w-[260px] lg:shrink-0 xl:w-[300px] min-[1800px]:w-[360px] lg:pt-4 xl:pt-8">
               {beforePanel}
             </div>
           ) : (
-            <div className="hidden lg:block lg:w-[280px] lg:shrink-0 xl:w-[320px] min-[1800px]:w-[360px] lg:pt-8 min-[1800px]:pt-[120px]" />
+            <div className="hidden lg:block lg:w-[260px] lg:shrink-0 xl:w-[300px] min-[1800px]:w-[360px] lg:pt-4 xl:pt-8" />
           )}
-          <div className="mx-auto w-full min-w-0 max-w-[680px] lg:mx-0 lg:w-[560px] lg:shrink-0 xl:w-[680px] min-[1800px]:w-auto min-[1800px]:max-w-[980px] min-[1800px]:min-w-[480px] min-[1800px]:flex-1">
+          <div className="mx-auto w-full min-w-0 max-w-full lg:mx-0 lg:min-w-[280px] lg:flex-1 xl:max-w-[680px] min-[1800px]:max-w-[980px]">
             {mode === 'calcul' ? (
               <NetworkVisualization
                 inputNeurons={inputNeurons}
@@ -677,7 +702,7 @@ const NetworkInteractionStep = ({
               thresholdPanel
             )}
           </div>
-          <div className="mx-auto w-full max-w-[360px] lg:mx-0 lg:w-[280px] lg:shrink-0 xl:w-[320px] min-[1800px]:w-[360px] min-[1800px]:max-w-[360px] lg:pt-8 min-[1800px]:pt-[120px]">
+          <div className="mx-auto w-full max-w-[360px] lg:mx-0 lg:w-[260px] lg:shrink-0 xl:w-[300px] min-[1800px]:w-[360px] lg:pt-4 xl:pt-8">
             {mode === 'calcul' ? (
               <section className="bg-white border-2 border-grey rounded-2xl p-4 sm:p-6 md:p-8 shadow-sm animate-fade-in-up min-h-[220px] flex items-center justify-center">
                 {allOutputsDone ? (

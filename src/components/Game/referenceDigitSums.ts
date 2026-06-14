@@ -1,8 +1,9 @@
 /**
  * Sommes « de référence » pour les pastilles sur la règlette mode seuil :
  * chaque grille vient de DIGIT_EXAMPLES (perfect = DIGIT_PATTERNS, good = variante).
- * Les entrées COL/LIG sont dérivées comme à l’étape comptage ; les seuils ReLU
- * cachés / de sortie sont ceux de NETWORK_STRUCTURE (réseau nominal).
+ * Les entrées COL/LIG sont dérivées comme à l’étape comptage.
+ * Pour les neurones de sortie, les sorties ReLU cachées utilisent les seuils
+ * passés en paramètre (sinon NETWORK_STRUCTURE par défaut).
  */
 import {
   DIGIT_EXAMPLES,
@@ -10,14 +11,18 @@ import {
   RECOGNIZED_DIGITS,
 } from './constants'
 import { resolveWinningDigit, type OutputActivation } from './networkDecision'
+import type { SessionDigitEntry } from './sessionDigits'
 
-export type DigitVariantTag = 'p' | 'g'
+export type DigitVariantTag = 'p' | 'g' | 'current' | 's'
 
 export type DigitReferenceMark = {
   digit: number
   variant: DigitVariantTag
   /** Somme affichée sur l’axe de la règlette (avant seuil du neurone courant). */
   sum: number
+  /** Grille 9×6 pour les variantes current / session (affichage miniature). */
+  grid?: number[][]
+  sessionId?: string
 }
 
 const hiddenInputsMap: Record<
@@ -100,21 +105,26 @@ function hiddenPreReLuSum(
 
 function hiddenReLuOutput(
   hiddenId: string,
-  inputValues: Record<string, number>
+  inputValues: Record<string, number>,
+  thresholds?: Record<string, number>
 ): number {
   const s = hiddenPreReLuSum(hiddenId, inputValues)
-  const th =
-    NETWORK_STRUCTURE.hiddenThresholds[
-      hiddenId as keyof typeof NETWORK_STRUCTURE.hiddenThresholds
-    ] ?? 0
+  const hiddenDefaults = NETWORK_STRUCTURE.hiddenThresholds as Record<
+    string,
+    number
+  >
+  const th = thresholds
+    ? resolveThreshold(thresholds, hiddenId, hiddenDefaults)
+    : (hiddenDefaults[hiddenId] ?? 0)
   return Math.max(0, s - th)
 }
 
 function outputPreReLuSum(
   outputId: string,
-  inputValues: Record<string, number>
+  inputValues: Record<string, number>,
+  thresholds?: Record<string, number>
 ): number {
-  const getH = (id: string) => hiddenReLuOutput(id, inputValues)
+  const getH = (id: string) => hiddenReLuOutput(id, inputValues, thresholds)
   const inputs: Record<string, number> = {}
   switch (outputId) {
     case 'NEURONE0':
@@ -153,9 +163,28 @@ function outputPreReLuSum(
   return Object.values(inputs).reduce((a, b) => a + (Number(b) || 0), 0)
 }
 
-function exampleGrid(digit: number, variant: DigitVariantTag): number[][] {
+function exampleGrid(
+  digit: number,
+  variant: Extract<DigitVariantTag, 'p' | 'g'>
+): number[][] {
   const entry = DIGIT_EXAMPLES[digit as keyof typeof DIGIT_EXAMPLES]
   return variant === 'p' ? entry.perfect : entry.good
+}
+
+function appendSessionMarks(
+  marks: DigitReferenceMark[],
+  sessionDigits: SessionDigitEntry[],
+  sumForGrid: (grid: number[][]) => number
+): void {
+  for (const entry of sessionDigits) {
+    marks.push({
+      digit: entry.digit,
+      variant: 's',
+      sum: sumForGrid(entry.grid),
+      grid: entry.grid,
+      sessionId: entry.id,
+    })
+  }
 }
 
 const hiddenMarksCache = new Map<string, DigitReferenceMark[]>()
@@ -216,6 +245,7 @@ function resolveThreshold(
 export type DigitRecognitionResult = {
   digit: number
   variant: DigitVariantTag
+  sessionId?: string
   /** Chiffre déclaré gagnant par le réseau, ou null si aucune sortie active. */
   recognizedDigit: number | null
   /** Le réseau reconnaît correctement le chiffre attendu. */
@@ -224,9 +254,10 @@ export type DigitRecognitionResult = {
   outputValues: Record<number, number>
 }
 
-/** Simule la reconnaissance pour tous les exemples DIGIT_EXAMPLES avec les seuils courants. */
+/** Simule la reconnaissance pour DIGIT_EXAMPLES et les grilles de session. */
 export function computeAllDigitRecognitions(
-  thresholds: Record<string, number>
+  thresholds: Record<string, number>,
+  sessionDigits: SessionDigitEntry[] = []
 ): DigitRecognitionResult[] {
   const hiddenDefaults = NETWORK_STRUCTURE.hiddenThresholds as Record<
     string,
@@ -242,34 +273,12 @@ export function computeAllDigitRecognitions(
     if (!(digit in DIGIT_EXAMPLES)) continue
     for (const variant of ['p', 'g'] as const) {
       const grid = exampleGrid(digit, variant)
-      const inputValues = patternToInputValues(grid)
-
-      const hiddenOutputs: Record<string, number> = {}
-      for (const hiddenId of NETWORK_STRUCTURE.hidden) {
-        const sum = hiddenPreReLuSum(hiddenId, inputValues)
-        const th = resolveThreshold(thresholds, hiddenId, hiddenDefaults)
-        hiddenOutputs[hiddenId] = Math.max(0, sum - th)
-      }
-
-      const outputValues: Record<number, number> = {}
-      for (const outputId of NETWORK_STRUCTURE.output) {
-        const outputDigit = parseInt(outputId.replace('NEURONE', ''), 10) || 0
-        const inputs = buildOutputInputsFromHiddenOutputs(
-          hiddenOutputs,
-          outputId
-        )
-        const sum = Object.values(inputs).reduce(
-          (acc, val) => acc + (Number(val) || 0),
-          0
-        )
-        const th = resolveThreshold(thresholds, outputId, outputDefaults)
-        outputValues[outputDigit] = Math.max(0, sum - th)
-      }
-
-      const activeOutputs: OutputActivation[] = Object.entries(outputValues).map(
-        ([digit, value]) => ({ digit: Number(digit), value })
+      const { recognizedDigit, outputValues } = simulateRecognitionForGrid(
+        grid,
+        thresholds,
+        hiddenDefaults,
+        outputDefaults
       )
-      const recognizedDigit = resolveWinningDigit(activeOutputs)
 
       results.push({
         digit,
@@ -281,14 +290,111 @@ export function computeAllDigitRecognitions(
     }
   }
 
+  for (const entry of sessionDigits) {
+    const { recognizedDigit, outputValues } = simulateRecognitionForGrid(
+      entry.grid,
+      thresholds,
+      hiddenDefaults,
+      outputDefaults
+    )
+    results.push({
+      digit: entry.digit,
+      variant: 's',
+      sessionId: entry.id,
+      recognizedDigit,
+      isRecognized: recognizedDigit === entry.digit,
+      outputValues,
+    })
+  }
+
   return results
 }
 
+function simulateRecognitionForGrid(
+  grid: number[][],
+  thresholds: Record<string, number>,
+  hiddenDefaults: Record<string, number>,
+  outputDefaults: Record<string, number>
+): { recognizedDigit: number | null; outputValues: Record<number, number> } {
+  const inputValues = patternToInputValues(grid)
+
+  const hiddenOutputs: Record<string, number> = {}
+  for (const hiddenId of NETWORK_STRUCTURE.hidden) {
+    const sum = hiddenPreReLuSum(hiddenId, inputValues)
+    const th = resolveThreshold(thresholds, hiddenId, hiddenDefaults)
+    hiddenOutputs[hiddenId] = Math.max(0, sum - th)
+  }
+
+  const outputValues: Record<number, number> = {}
+  for (const outputId of NETWORK_STRUCTURE.output) {
+    const outputDigit = parseInt(outputId.replace('NEURONE', ''), 10) || 0
+    const inputs = buildOutputInputsFromHiddenOutputs(hiddenOutputs, outputId)
+    const sum = Object.values(inputs).reduce(
+      (acc, val) => acc + (Number(val) || 0),
+      0
+    )
+    const th = resolveThreshold(thresholds, outputId, outputDefaults)
+    outputValues[outputDigit] = Math.max(0, sum - th)
+  }
+
+  const activeOutputs: OutputActivation[] = Object.entries(outputValues).map(
+    ([digit, value]) => ({ digit: Number(digit), value })
+  )
+
+  return {
+    recognizedDigit: resolveWinningDigit(activeOutputs),
+    outputValues,
+  }
+}
+
+/** Simule la reconnaissance de la grille en cours avec les seuils courants. */
+export function computeCurrentGridRecognition(
+  thresholds: Record<string, number>,
+  grid: number[][],
+  expectedDigit: number | null
+): DigitRecognitionResult | null {
+  if (grid.length === 0) return null
+
+  const hiddenDefaults = NETWORK_STRUCTURE.hiddenThresholds as Record<
+    string,
+    number
+  >
+  const outputDefaults = NETWORK_STRUCTURE.outputThresholds as Record<
+    string,
+    number
+  >
+  const { recognizedDigit, outputValues } = simulateRecognitionForGrid(
+    grid,
+    thresholds,
+    hiddenDefaults,
+    outputDefaults
+  )
+
+  return {
+    digit: expectedDigit ?? -1,
+    variant: 'current',
+    recognizedDigit,
+    isRecognized:
+      expectedDigit != null &&
+      recognizedDigit != null &&
+      recognizedDigit === expectedDigit,
+    outputValues,
+  }
+}
+
 export function getReferenceMarksForHiddenNeuron(
-  hiddenId: string
+  hiddenId: string,
+  currentGrid?: number[][] | null,
+  currentDigit?: number | null,
+  sessionDigits: SessionDigitEntry[] = []
 ): DigitReferenceMark[] {
-  const cached = hiddenMarksCache.get(hiddenId)
-  if (cached) return cached
+  const useCache =
+    !currentGrid && sessionDigits.length === 0
+  if (useCache) {
+    const cached = hiddenMarksCache.get(hiddenId)
+    if (cached) return cached
+  }
+
   const marks: DigitReferenceMark[] = []
   for (const digit of RECOGNIZED_DIGITS) {
     if (!(digit in DIGIT_EXAMPLES)) continue
@@ -299,26 +405,73 @@ export function getReferenceMarksForHiddenNeuron(
       marks.push({ digit, variant, sum })
     }
   }
-  hiddenMarksCache.set(hiddenId, marks)
+
+  appendSessionMarks(marks, sessionDigits, (grid) =>
+    hiddenPreReLuSum(hiddenId, patternToInputValues(grid))
+  )
+
+  if (currentGrid) {
+    const sum = hiddenPreReLuSum(hiddenId, patternToInputValues(currentGrid))
+    marks.push({
+      digit: currentDigit ?? -1,
+      variant: 'current',
+      sum,
+      grid: currentGrid,
+    })
+  }
+
+  if (useCache) {
+    hiddenMarksCache.set(hiddenId, marks)
+  }
   return marks
 }
 
 export function getReferenceMarksForOutputNeuron(
-  outputId: string
+  outputId: string,
+  currentGrid?: number[][] | null,
+  currentDigit?: number | null,
+  thresholds?: Record<string, number>,
+  sessionDigits: SessionDigitEntry[] = []
 ): DigitReferenceMark[] {
-  const cached = outputMarksCache.get(outputId)
-  if (cached) return cached
+  const useCache =
+    !currentGrid && thresholds == null && sessionDigits.length === 0
+  if (useCache) {
+    const cached = outputMarksCache.get(outputId)
+    if (cached) return cached
+  }
+
   const marks: DigitReferenceMark[] = []
   for (const digit of RECOGNIZED_DIGITS) {
     if (!(digit in DIGIT_EXAMPLES)) continue
     for (const variant of ['p', 'g'] as const) {
       const grid = exampleGrid(digit, variant)
       const inputValues = patternToInputValues(grid)
-      const sum = outputPreReLuSum(outputId, inputValues)
+      const sum = outputPreReLuSum(outputId, inputValues, thresholds)
       marks.push({ digit, variant, sum })
     }
   }
-  outputMarksCache.set(outputId, marks)
+
+  appendSessionMarks(marks, sessionDigits, (grid) =>
+    outputPreReLuSum(outputId, patternToInputValues(grid), thresholds)
+  )
+
+  if (currentGrid) {
+    const sum = outputPreReLuSum(
+      outputId,
+      patternToInputValues(currentGrid),
+      thresholds
+    )
+    marks.push({
+      digit: currentDigit ?? -1,
+      variant: 'current',
+      sum,
+      grid: currentGrid,
+    })
+  }
+
+  if (useCache) {
+    outputMarksCache.set(outputId, marks)
+  }
   return marks
 }
 

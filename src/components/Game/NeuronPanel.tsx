@@ -120,10 +120,10 @@ const NeuronPanel = ({
   }, [])
 
   return (
-    <div className="fixed inset-0 bg-darkBlue/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white border-2 border-grey rounded-2xl p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-xl">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-darkBlue text-3xl font-bold tracking-wide">
+    <div className="fixed inset-0 bg-darkBlue/40 z-50 flex items-end sm:items-center justify-center p-2 sm:p-4">
+      <div className="bg-white border-2 border-grey rounded-2xl p-4 sm:p-8 max-w-2xl w-full max-h-[92vh] sm:max-h-[90vh] overflow-y-auto shadow-xl">
+        <div className="flex justify-between items-center mb-4 sm:mb-6 gap-3">
+          <h2 className="text-darkBlue text-xl sm:text-3xl font-bold tracking-wide">
             Neurone {isOutput ? neuron.digit : neuronId}
           </h2>
           <button

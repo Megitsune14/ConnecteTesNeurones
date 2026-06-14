@@ -37,6 +37,7 @@ const Game = () => {
     userDrawnGrid,
     loadDigitExample,
     applySeuilThreshold,
+    resetThresholdsToDefaults,
   } = useGame()
 
   const [openExampleDigit, setOpenExampleDigit] = useState<number | null>(null)
@@ -156,6 +157,7 @@ const Game = () => {
               selectedDigit={selectedDigit}
               onReset={resetToDigitSelection}
               onApplySeuilThreshold={applySeuilThreshold}
+              onResetThresholds={resetThresholdsToDefaults}
             />
           )}
           {activeNeuronId != null && activeNeuron != null && (

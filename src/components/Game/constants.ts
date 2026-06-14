@@ -51,6 +51,9 @@ export const RECOGNIZED_DIGITS = Object.keys(DIGIT_PATTERNS)
   .map((k) => Number(k))
   .sort((a, b) => a - b) as readonly number[]
 
+/** Chiffres dessinables mais non reconnus par le réseau. */
+export const UNRECOGNIZED_DIGITS = [1, 2, 4, 5, 7, 8] as const
+
 const clonePattern = (pattern: number[][]): number[][] =>
   pattern.map((row) => [...row])
 
