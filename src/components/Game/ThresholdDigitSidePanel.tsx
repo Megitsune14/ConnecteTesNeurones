@@ -9,6 +9,9 @@ import {
   type DigitVariantTag,
 } from './referenceDigitSums'
 import type { SessionDigitEntry } from './sessionDigits'
+import {
+  formatAmbiguityMessage,
+} from './networkDecision'
 
 interface ThresholdDigitSidePanelProps {
   thresholdValues: Record<string, number>
@@ -29,9 +32,39 @@ const VARIANT_LABELS: Record<DigitVariantTag, string> = {
 }
 
 function recognitionStatusLabel(result: DigitRecognitionResult): string {
+  if (result.isAmbiguous) {
+    return formatAmbiguityMessage(result.ambiguousDigits)
+  }
   if (result.isRecognized) return `Reconnu comme ${result.digit}`
   if (result.recognizedDigit === null) return 'Non reconnu'
   return `Confondu avec ${result.recognizedDigit}`
+}
+
+function recognitionCardClasses(result: DigitRecognitionResult): string {
+  if (result.isRecognized) {
+    return 'border-green/50 bg-green/10'
+  }
+  if (result.isAmbiguous) {
+    return 'border-yellow-hover/60 bg-yellow/15'
+  }
+  if (result.recognizedDigit === null) {
+    return 'border-grey bg-white'
+  }
+  return 'border-red/40 bg-red/5'
+}
+
+function recognitionTextClasses(result: DigitRecognitionResult): string {
+  if (result.isRecognized) return 'text-green'
+  if (result.isAmbiguous) return 'text-darkBlue'
+  if (result.recognizedDigit === null) return 'text-astro'
+  return 'text-red'
+}
+
+function recognitionSymbol(result: DigitRecognitionResult): string {
+  if (result.isRecognized) return '✓'
+  if (result.isAmbiguous) return '↔'
+  if (result.recognizedDigit === null) return '—'
+  return `→ ${result.recognizedDigit}`
 }
 
 const ThresholdDigitSidePanel = ({
@@ -158,11 +191,7 @@ const ThresholdDigitSidePanel = ({
               <div
                 className={[
                   'rounded-lg border px-2.5 py-2 text-xs',
-                  currentRecognition.isRecognized
-                    ? 'border-green/50 bg-green/10'
-                    : currentRecognition.recognizedDigit === null
-                      ? 'border-grey bg-white'
-                      : 'border-red/40 bg-red/5',
+                  recognitionCardClasses(currentRecognition),
                 ].join(' ')}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -172,35 +201,15 @@ const ThresholdDigitSidePanel = ({
                     aria-label={`Dessin du chiffre en cours${selectedDigit != null ? ` (${selectedDigit})` : ''}`}
                   />
                   <span
-                    className={`shrink-0 font-semibold ${
-                      currentRecognition.isRecognized
-                        ? 'text-green'
-                        : currentRecognition.recognizedDigit === null
-                          ? 'text-astro'
-                          : 'text-red'
-                    }`}
+                    className={`shrink-0 font-semibold ${recognitionTextClasses(currentRecognition)}`}
                   >
-                    {currentRecognition.isRecognized
-                      ? '✓'
-                      : currentRecognition.recognizedDigit === null
-                        ? '—'
-                        : `→ ${currentRecognition.recognizedDigit}`}
+                    {recognitionSymbol(currentRecognition)}
                   </span>
                 </div>
                 <p
-                  className={`mt-2 font-semibold ${
-                    currentRecognition.isRecognized
-                      ? 'text-green'
-                      : currentRecognition.recognizedDigit === null
-                        ? 'text-astro'
-                        : 'text-red'
-                  }`}
+                  className={`mt-2 font-semibold ${recognitionTextClasses(currentRecognition)}`}
                 >
-                  {currentRecognition.isRecognized
-                    ? `Reconnu comme ${selectedDigit}`
-                    : currentRecognition.recognizedDigit === null
-                      ? 'Non reconnu'
-                      : `Confondu avec ${currentRecognition.recognizedDigit}`}
+                  {recognitionStatusLabel(currentRecognition)}
                 </p>
                 <button
                   type="button"
@@ -228,11 +237,7 @@ const ThresholdDigitSidePanel = ({
                       key={result.sessionId}
                       className={[
                         'rounded-lg border px-2.5 py-2 text-xs',
-                        result.isRecognized
-                          ? 'border-green/50 bg-green/10'
-                          : result.recognizedDigit === null
-                            ? 'border-grey bg-white'
-                            : 'border-red/40 bg-red/5',
+                        recognitionCardClasses(result),
                       ].join(' ')}
                     >
                       <div className="flex items-start justify-between gap-2">
@@ -243,19 +248,9 @@ const ThresholdDigitSidePanel = ({
                         />
                         <div className="flex shrink-0 flex-col items-end gap-1">
                           <span
-                            className={`font-semibold ${
-                              result.isRecognized
-                                ? 'text-green'
-                                : result.recognizedDigit === null
-                                  ? 'text-astro'
-                                  : 'text-red'
-                            }`}
+                            className={`font-semibold ${recognitionTextClasses(result)}`}
                           >
-                            {result.isRecognized
-                              ? '✓'
-                              : result.recognizedDigit === null
-                                ? '—'
-                                : `→ ${result.recognizedDigit}`}
+                            {recognitionSymbol(result)}
                           </span>
                           <button
                             type="button"
@@ -270,13 +265,7 @@ const ThresholdDigitSidePanel = ({
                         {VARIANT_LABELS.s} — attendu {entry.digit}
                       </p>
                       <p
-                        className={`mt-0.5 font-semibold ${
-                          result.isRecognized
-                            ? 'text-green'
-                            : result.recognizedDigit === null
-                              ? 'text-astro'
-                              : 'text-red'
-                        }`}
+                        className={`mt-0.5 font-semibold ${recognitionTextClasses(result)}`}
                       >
                         {recognitionStatusLabel(result)}
                       </p>
@@ -324,11 +313,7 @@ const ThresholdDigitSidePanel = ({
                         key={`${result.digit}-${result.variant}`}
                         className={[
                           'rounded-lg border px-2.5 py-2 text-xs',
-                          result.isRecognized
-                            ? 'border-green/50 bg-green/10'
-                            : result.recognizedDigit === null
-                              ? 'border-grey bg-white'
-                              : 'border-red/40 bg-red/5',
+                          recognitionCardClasses(result),
                         ].join(' ')}
                       >
                         <div className="flex items-center justify-between gap-2">
@@ -343,32 +328,16 @@ const ThresholdDigitSidePanel = ({
                             {result.variant}
                           </span>
                           <span
-                            className={`font-semibold ${
-                              result.isRecognized
-                                ? 'text-green'
-                                : result.recognizedDigit === null
-                                  ? 'text-astro'
-                                  : 'text-red'
-                            }`}
+                            className={`font-semibold ${recognitionTextClasses(result)}`}
                           >
-                            {result.isRecognized
-                              ? '✓'
-                              : result.recognizedDigit === null
-                                ? '—'
-                                : `→ ${result.recognizedDigit}`}
+                            {recognitionSymbol(result)}
                           </span>
                         </div>
                         <p className="mt-1 font-medium text-astro">
                           {VARIANT_LABELS[result.variant]}
                         </p>
                         <p
-                          className={`mt-0.5 font-semibold ${
-                            result.isRecognized
-                              ? 'text-green'
-                              : result.recognizedDigit === null
-                                ? 'text-astro'
-                                : 'text-red'
-                          }`}
+                          className={`mt-0.5 font-semibold ${recognitionTextClasses(result)}`}
                         >
                           {recognitionStatusLabel(result)}
                         </p>

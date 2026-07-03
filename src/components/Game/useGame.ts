@@ -1,7 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { ProgressStep, InputNeuronData, NeuronData } from './types'
 import { NETWORK_STRUCTURE, DIGIT_PATTERNS, DIGIT_EXAMPLES } from './constants'
-import { resolveWinningDigit, type OutputActivation } from './networkDecision'
+import {
+  resolveNetworkDecision,
+  type NetworkDecision,
+  type OutputActivation,
+} from './networkDecision'
 
 const hiddenInputsMap: Record<
   string,
@@ -251,7 +255,9 @@ export function useGame() {
   const [hiddenNeurons, setHiddenNeurons] = useState<NeuronData[]>([])
   const [outputNeurons, setOutputNeurons] = useState<NeuronData[]>([])
   const [activeNeuronId, setActiveNeuronId] = useState<string | null>(null)
-  const [finalDecision, setFinalDecision] = useState<number | null>(null)
+  const [networkDecision, setNetworkDecision] = useState<NetworkDecision>({
+    status: 'none',
+  })
 
   const selectDigit = useCallback((digit: number) => {
     setSelectedDigit(digit)
@@ -471,7 +477,7 @@ export function useGame() {
       if (hiddenIds.includes(neuronId)) {
         const target = hiddenNeurons.find((n) => n.id === neuronId)
         if (!target || target.threshold === t) return
-        setFinalDecision(null)
+        setNetworkDecision({ status: 'none' })
         setHiddenNeurons((prevH) => {
           const nextH = applyHiddenThresholdMap(prevH, neuronId, t)
           setOutputNeurons((prevO) => cascadeInvalidateOutputs(nextH, prevO))
@@ -483,7 +489,7 @@ export function useGame() {
       if (outputIds.includes(neuronId)) {
         const target = outputNeurons.find((n) => n.id === neuronId)
         if (!target || target.threshold === t) return
-        setFinalDecision(null)
+        setNetworkDecision({ status: 'none' })
         setOutputNeurons((prev) =>
           prev.map((n) => {
             if (n.id !== neuronId) return n
@@ -669,7 +675,7 @@ export function useGame() {
       }
 
       // Empêche d'afficher une décision qui dépend d'un état "toutes les sorties validées".
-      setFinalDecision(null)
+      setNetworkDecision({ status: 'none' })
     },
     [hiddenNeurons]
   )
@@ -713,7 +719,7 @@ export function useGame() {
         digit: n.digit ?? (parseInt(n.id.replace('NEURONE', ''), 10) || 0),
         value: n.calculatedOutput ?? 0,
       }))
-    setFinalDecision(resolveWinningDigit(activations))
+    setNetworkDecision(resolveNetworkDecision(activations))
   }, [outputNeurons])
 
   const resetThresholdsToDefaults = useCallback(() => {
@@ -733,7 +739,7 @@ export function useGame() {
     })
     if (!anyHiddenToReset && !anyOutputToReset) return
 
-    setFinalDecision(null)
+    setNetworkDecision({ status: 'none' })
     setHiddenNeurons((prevH) => {
       let nextH = prevH
       let anyHiddenChanged = false
@@ -781,7 +787,7 @@ export function useGame() {
     setInputLayerNeurons([])
     setHiddenNeurons([])
     setOutputNeurons([])
-    setFinalDecision(null)
+    setNetworkDecision({ status: 'none' })
     setUserCounts({})
     setActiveNeuronId(null)
     setCurrentStep('digit-selection')
@@ -809,7 +815,7 @@ export function useGame() {
       setInputLayerNeurons([])
       setHiddenNeurons([])
       setOutputNeurons([])
-      setFinalDecision(null)
+      setNetworkDecision({ status: 'none' })
       setActiveNeuronId(null)
       try {
         sessionStorage.removeItem(STORAGE_KEY_DRAWN_GRID)
@@ -885,7 +891,7 @@ export function useGame() {
     outputNeurons,
     activeNeuronId,
     setActiveNeuronId,
-    finalDecision,
+    networkDecision,
     selectDigit,
     loadDigitExample,
     validateDigitGrid,

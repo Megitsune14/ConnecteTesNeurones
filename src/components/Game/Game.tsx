@@ -19,7 +19,7 @@ const Game = () => {
     outputNeurons,
     activeNeuronId,
     setActiveNeuronId,
-    finalDecision,
+    networkDecision,
     validateDigitGrid,
     updateUserCount,
     allCountsEntered,
@@ -153,7 +153,7 @@ const Game = () => {
               onNeuronClick={setActiveNeuronId}
               onAutoCalculateHidden={autoCalculateHiddenNeurons}
               onAutoCalculateOutput={autoCalculateOutputNeurons}
-              finalDecision={finalDecision}
+              networkDecision={networkDecision}
               selectedDigit={selectedDigit}
               onReset={resetToDigitSelection}
               onApplySeuilThreshold={applySeuilThreshold}

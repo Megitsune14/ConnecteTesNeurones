@@ -10,7 +10,11 @@ import {
   NETWORK_STRUCTURE,
   RECOGNIZED_DIGITS,
 } from './constants'
-import { resolveWinningDigit, type OutputActivation } from './networkDecision'
+import {
+  resolveNetworkDecision,
+  type NetworkDecision,
+  type OutputActivation,
+} from './networkDecision'
 import type { SessionDigitEntry } from './sessionDigits'
 
 export type DigitVariantTag = 'p' | 'g' | 'current' | 's'
@@ -246,12 +250,41 @@ export type DigitRecognitionResult = {
   digit: number
   variant: DigitVariantTag
   sessionId?: string
-  /** Chiffre déclaré gagnant par le réseau, ou null si aucune sortie active. */
+  decision: NetworkDecision
+  /** Chiffre unique reconnu, ou null si aucune sortie active ou ambiguïté. */
   recognizedDigit: number | null
-  /** Le réseau reconnaît correctement le chiffre attendu. */
+  isAmbiguous: boolean
+  ambiguousDigits: number[]
+  /** Le réseau reconnaît clairement le chiffre attendu (un seul actif). */
   isRecognized: boolean
   /** Sorties ReLU des neurones de sortie (0, 3, 6, 9). */
   outputValues: Record<number, number>
+}
+
+function buildRecognitionResult(
+  expectedDigit: number,
+  variant: DigitVariantTag,
+  decision: NetworkDecision,
+  outputValues: Record<number, number>,
+  sessionId?: string
+): DigitRecognitionResult {
+  const isAmbiguous = decision.status === 'ambiguous'
+  const ambiguousDigits =
+    decision.status === 'ambiguous' ? decision.digits : []
+  const recognizedDigit =
+    decision.status === 'clear' ? decision.digit : null
+  return {
+    digit: expectedDigit,
+    variant,
+    sessionId,
+    decision,
+    recognizedDigit,
+    isAmbiguous,
+    ambiguousDigits,
+    isRecognized:
+      decision.status === 'clear' && decision.digit === expectedDigit,
+    outputValues,
+  }
 }
 
 /** Simule la reconnaissance pour DIGIT_EXAMPLES et les grilles de session. */
@@ -273,38 +306,35 @@ export function computeAllDigitRecognitions(
     if (!(digit in DIGIT_EXAMPLES)) continue
     for (const variant of ['p', 'g'] as const) {
       const grid = exampleGrid(digit, variant)
-      const { recognizedDigit, outputValues } = simulateRecognitionForGrid(
+      const { decision, outputValues } = simulateRecognitionForGrid(
         grid,
         thresholds,
         hiddenDefaults,
         outputDefaults
       )
 
-      results.push({
-        digit,
-        variant,
-        recognizedDigit,
-        isRecognized: recognizedDigit === digit,
-        outputValues,
-      })
+      results.push(
+        buildRecognitionResult(digit, variant, decision, outputValues)
+      )
     }
   }
 
   for (const entry of sessionDigits) {
-    const { recognizedDigit, outputValues } = simulateRecognitionForGrid(
+    const { decision, outputValues } = simulateRecognitionForGrid(
       entry.grid,
       thresholds,
       hiddenDefaults,
       outputDefaults
     )
-    results.push({
-      digit: entry.digit,
-      variant: 's',
-      sessionId: entry.id,
-      recognizedDigit,
-      isRecognized: recognizedDigit === entry.digit,
-      outputValues,
-    })
+    results.push(
+      buildRecognitionResult(
+        entry.digit,
+        's',
+        decision,
+        outputValues,
+        entry.id
+      )
+    )
   }
 
   return results
@@ -315,7 +345,7 @@ function simulateRecognitionForGrid(
   thresholds: Record<string, number>,
   hiddenDefaults: Record<string, number>,
   outputDefaults: Record<string, number>
-): { recognizedDigit: number | null; outputValues: Record<number, number> } {
+): { decision: NetworkDecision; outputValues: Record<number, number> } {
   const inputValues = patternToInputValues(grid)
 
   const hiddenOutputs: Record<string, number> = {}
@@ -342,7 +372,7 @@ function simulateRecognitionForGrid(
   )
 
   return {
-    recognizedDigit: resolveWinningDigit(activeOutputs),
+    decision: resolveNetworkDecision(activeOutputs),
     outputValues,
   }
 }
@@ -363,23 +393,19 @@ export function computeCurrentGridRecognition(
     string,
     number
   >
-  const { recognizedDigit, outputValues } = simulateRecognitionForGrid(
+  const { decision, outputValues } = simulateRecognitionForGrid(
     grid,
     thresholds,
     hiddenDefaults,
     outputDefaults
   )
 
-  return {
-    digit: expectedDigit ?? -1,
-    variant: 'current',
-    recognizedDigit,
-    isRecognized:
-      expectedDigit != null &&
-      recognizedDigit != null &&
-      recognizedDigit === expectedDigit,
-    outputValues,
-  }
+  return buildRecognitionResult(
+    expectedDigit ?? -1,
+    'current',
+    decision,
+    outputValues
+  )
 }
 
 export function getReferenceMarksForHiddenNeuron(
