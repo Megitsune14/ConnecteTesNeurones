@@ -4,7 +4,8 @@ import type { NetworkVisualizationProps } from './types'
 import { NETWORK_STRUCTURE } from './constants'
 import {
   getOutputVerdictLabel,
-  resolveWinningDigit,
+  getOutputVerdictOutcome,
+  resolveNetworkDecision,
   type OutputActivation,
 } from './networkDecision'
 import type { NeuronData } from './types'
@@ -170,7 +171,7 @@ const NetworkVisualization = ({
     outputNeurons.length > 0 &&
     outputNeurons.every((n) => n.outputValidated)
 
-  const winningDigit = resolveWinningDigit(
+  const networkDecision = resolveNetworkDecision(
     NETWORK_STRUCTURE.output
       .map((outputId) => outputNeurons.find((n) => n.id === outputId))
       .filter((n): n is NeuronData => n != null && n.outputValidated)
@@ -305,15 +306,20 @@ const NetworkVisualization = ({
       const isValidated = neuron?.outputValidated ?? false
 
       let label = ''
-      let outcome: 'winner' | 'loser' = 'loser'
+      let outcome: 'winner' | 'loser' | 'ambiguous' = 'loser'
 
       if (isValidated && allOutputsValidated) {
-        const labelText = getOutputVerdictLabel(digit, winningDigit, {
+        const activation = neuron?.calculatedOutput ?? 0
+        const labelText = getOutputVerdictLabel(digit, networkDecision, {
           allOutputsValidated: true,
           neuronValidated: true,
+          activation,
         })
-        const isWinner = winningDigit !== null && digit === winningDigit
-        outcome = isWinner ? 'winner' : 'loser'
+        outcome = getOutputVerdictOutcome(digit, networkDecision, {
+          allOutputsValidated: true,
+          neuronValidated: true,
+          activation,
+        })
         label = labelText ?? ''
       }
 
@@ -447,15 +453,20 @@ const NetworkVisualization = ({
         const verdictNode = cy.getElementById(`${id}_VERDICT`)
         if (verdictNode.length > 0) {
           let label = ''
-          let outcome: 'winner' | 'loser' = 'loser'
+          let outcome: 'winner' | 'loser' | 'ambiguous' = 'loser'
           const isValidated = neuron?.outputValidated ?? false
           if (isValidated && allOutputsValidated) {
-            const labelText = getOutputVerdictLabel(digit, winningDigit, {
+            const activation = neuron?.calculatedOutput ?? 0
+            const labelText = getOutputVerdictLabel(digit, networkDecision, {
               allOutputsValidated: true,
               neuronValidated: true,
+              activation,
             })
-            const isWinner = winningDigit !== null && digit === winningDigit
-            outcome = isWinner ? 'winner' : 'loser'
+            outcome = getOutputVerdictOutcome(digit, networkDecision, {
+              allOutputsValidated: true,
+              neuronValidated: true,
+              activation,
+            })
             label = labelText ?? ''
           }
           verdictNode.data('label', label)

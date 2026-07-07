@@ -3,12 +3,14 @@ import type { InputNeuronData, NeuronData } from '../types'
 import NetworkVisualization from '../NetworkVisualization'
 import { NETWORK_STRUCTURE, NEURONE_FORMULAS } from '../constants'
 import {
-  DIGIT_MARK_BADGE_CLASSES,
   getReferenceMarksForHiddenNeuron,
   getReferenceMarksForOutputNeuron,
 } from '../referenceDigitSums'
 import ThresholdDigitSidePanel from '../ThresholdDigitSidePanel'
-import MiniDigitGrid from '../MiniDigitGrid'
+import ThresholdRuler, {
+  THRESHOLD_RULER_MAX,
+  THRESHOLD_RULER_MIN,
+} from '../ThresholdRuler'
 import { useSessionDigits } from '../sessionDigits'
 import {
   formatAmbiguityMessage,
@@ -144,9 +146,13 @@ const NetworkInteractionStep = ({
     neuron.layer === 'output' ? `Neurone ${neuron.digit ?? ''}`.trim() : `Neurone ${neuron.id}`
 
   const updateThreshold = (neuronId: string, nextValue: number) => {
+    const clamped = Math.max(
+      THRESHOLD_RULER_MIN,
+      Math.min(THRESHOLD_RULER_MAX, Math.round(nextValue))
+    )
     setThresholdValues((prev) => ({
       ...prev,
-      [neuronId]: Math.round(nextValue),
+      [neuronId]: clamped,
     }))
   }
 
@@ -168,8 +174,8 @@ const NetworkInteractionStep = ({
   }
 
   const thresholdPanel = (
-    <section className="bg-white border-2 border-grey rounded-2xl p-4 sm:p-6 shadow-sm animate-fade-in-up">
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+    <section className="mx-auto w-full max-w-5xl bg-white border-2 border-grey rounded-2xl p-3 sm:p-4 shadow-sm animate-fade-in-up">
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="flex flex-wrap justify-center gap-3">
           <button
             type="button"
@@ -221,7 +227,7 @@ const NetworkInteractionStep = ({
         </p>
       )}
 
-      <div className="space-y-5">
+      <div className="space-y-4">
         {neuronsForThresholdMode.map((neuron) => {
           const sumValue =
             neuron.calculatedSum ??
@@ -245,46 +251,7 @@ const NetworkInteractionStep = ({
                   effectiveThresholds,
                   sessionDigits
                 )
-          const refSums = refMarks.map((m) => m.sum)
-          const minValue = Math.min(
-            -8,
-            Math.floor(Math.min(sumValue, thresholdValue, ...refSums) - 4)
-          )
-          const maxValue = Math.max(
-            12,
-            Math.ceil(Math.max(sumValue, thresholdValue, ...refSums) + 4)
-          )
-          const rulerValues = Array.from(
-            { length: maxValue - minValue + 1 },
-            (_, index) => minValue + index
-          )
           const displayedSum = Math.round(sumValue)
-          const cellCount = Math.max(1, rulerValues.length)
-          const clampPercent = (v: number) => Math.max(0, Math.min(100, v))
-          const thresholdPosition = clampPercent(
-            ((thresholdValue - minValue + 1) / cellCount) * 100
-          )
-
-          const refByRounded = new Map<number, typeof refMarks>()
-          for (const m of refMarks) {
-            const r = Math.round(m.sum)
-            const list = refByRounded.get(r) ?? []
-            list.push(m)
-            refByRounded.set(r, list)
-          }
-          for (const list of refByRounded.values()) {
-            list.sort(
-              (a, b) =>
-                a.digit - b.digit || a.variant.localeCompare(b.variant)
-            )
-          }
-
-          const rulerMarkerPositions = Array.from(
-            new Set([
-              ...refByRounded.keys(),
-              ...(pattern != null ? [displayedSum] : []),
-            ])
-          ).sort((a, b) => a - b)
 
           const neuronDigit =
             neuron.digit ?? (parseInt(neuron.id.replace('NEURONE', ''), 10) || 0)
@@ -311,118 +278,25 @@ const NetworkInteractionStep = ({
           })
 
           return (
-            <div key={neuron.id} className="rounded-xl border-2 border-grey p-3">
-              <div className="mb-2 text-center text-darkBlue font-bold text-lg">
+            <div key={neuron.id} className="rounded-xl border-2 border-grey p-2.5 sm:p-3">
+              <div className="mb-1.5 text-center text-darkBlue font-bold text-base">
                 {getNeuronLabel(neuron)}
               </div>
-              <div className="mb-3 rounded-lg border border-grey bg-gray-50 px-3 py-2 text-xs text-darkBlue">
+              <div className="mb-2 rounded-lg border border-grey bg-gray-50 px-2.5 py-1.5 text-[11px] text-darkBlue">
                 <p className="font-semibold">
                   Formule : {formula || '—'} | Calcul : {calcExpression}
                 </p>
               </div>
 
-              <div className="overflow-x-auto">
-                <div className="inline-block min-w-full">
-                  <div
-                    className="grid text-center text-xs font-bold text-astro"
-                    style={{
-                      gridTemplateColumns: `repeat(${rulerValues.length}, 38px)`,
-                    }}
-                  >
-                    {rulerValues.map((value) => (
-                      <div key={`${neuron.id}-top-${value}`}>{value}</div>
-                    ))}
-                  </div>
+              <ThresholdRuler
+                neuronId={neuron.id}
+                thresholdValue={thresholdValue}
+                refMarks={refMarks}
+                displayedSum={displayedSum}
+                hasCurrentGrid={pattern != null}
+              />
 
-                  <div className="relative mt-1 rounded border-2 border-grey">
-                    <div
-                      className="grid min-h-[68px] items-center bg-grey/40"
-                      style={{
-                        gridTemplateColumns: `repeat(${rulerValues.length}, 38px)`,
-                      }}
-                    >
-                      {rulerValues.map((value) => (
-                        <div
-                          key={`${neuron.id}-mid-${value}`}
-                          className={`h-full min-h-[68px] border-r border-grey/70 last:border-r-0 ${
-                            value > thresholdValue ? 'bg-green/20' : 'bg-red/20'
-                          }`}
-                        />
-                      ))}
-                    </div>
-                    <div
-                      className="pointer-events-none absolute inset-y-0 z-20 w-[3px] bg-darkBlue"
-                      style={{
-                        left: `${thresholdPosition}%`,
-                        transform: 'translateX(-50%)',
-                      }}
-                      aria-hidden
-                    />
-                    {rulerMarkerPositions.map((rounded) => {
-                      const marks = refByRounded.get(rounded) ?? []
-                      if (marks.length === 0) return null
-
-                      const leftPct = clampPercent(
-                        ((rounded - minValue + 0.5) / cellCount) * 100
-                      )
-                      return (
-                        <div
-                          key={`${neuron.id}-marker-${rounded}`}
-                          className="pointer-events-none absolute top-1/2 z-30 flex flex-col items-center gap-0.5"
-                          style={{
-                            left: `${leftPct}%`,
-                            transform: 'translate(-50%, -50%)',
-                          }}
-                        >
-                          {marks.map((m) =>
-                            (m.variant === 'current' || m.variant === 's') &&
-                            m.grid != null ? (
-                              <MiniDigitGrid
-                                key={
-                                  m.sessionId
-                                    ? `${neuron.id}-session-${m.sessionId}`
-                                    : `${neuron.id}-current-${rounded}`
-                                }
-                                pattern={m.grid}
-                              />
-                            ) : m.variant === 'p' || m.variant === 'g' ? (
-                              <span
-                                key={`${neuron.id}-${m.digit}-${m.variant}`}
-                                className={[
-                                  'inline-flex rounded border-2 px-1 py-px text-[10px] font-bold leading-none shadow-sm',
-                                  DIGIT_MARK_BADGE_CLASSES[m.digit] ??
-                                    'border-grey bg-white text-darkBlue',
-                                ].join(' ')}
-                                title={`Chiffre ${m.digit}, motif ${
-                                  m.variant === 'p' ? 'perfect' : 'good'
-                                } (DIGIT_EXAMPLES) — somme ${m.sum}`}
-                              >
-                                {m.digit}
-                                {m.variant}
-                              </span>
-                            ) : null
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-
-                  <div
-                    className="grid text-center text-xs font-bold text-astro mt-1"
-                    style={{
-                      gridTemplateColumns: `repeat(${rulerValues.length}, 38px)`,
-                    }}
-                  >
-                    {rulerValues.map((value) => (
-                      <div key={`${neuron.id}-bot-${value}`}>
-                        {Math.max(0, value - thresholdValue)}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-3 flex items-center gap-3">
+              <div className="mx-auto mt-2 flex w-full items-center gap-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -436,8 +310,8 @@ const NetworkInteractionStep = ({
                 </button>
                 <input
                   type="range"
-                  min={minValue}
-                  max={maxValue}
+                  min={THRESHOLD_RULER_MIN}
+                  max={THRESHOLD_RULER_MAX}
                   step={1}
                   value={thresholdValue}
                   onChange={(e) => {
@@ -534,105 +408,11 @@ const NetworkInteractionStep = ({
               onAutoCalculateHidden={onAutoCalculateHidden}
               onAutoCalculateOutput={onAutoCalculateOutput}
               pattern={pattern}
-              finalDecision={finalDecision}
               selectedDigit={selectedDigit}
             />
           ) : (
             thresholdPanel
           )}
-<<<<<<< HEAD
-=======
-          <div className="mx-auto w-full min-w-0 max-w-full lg:mx-0 lg:min-w-[280px] lg:flex-1 xl:max-w-[680px] min-[1800px]:max-w-[980px]">
-            {mode === 'calcul' ? (
-              <NetworkVisualization
-                inputNeurons={inputNeurons}
-                hiddenNeurons={hiddenNeurons}
-                outputNeurons={outputNeurons}
-                onNeuronClick={onNeuronClick}
-                onAutoCalculateHidden={onAutoCalculateHidden}
-                onAutoCalculateOutput={onAutoCalculateOutput}
-              />
-            ) : (
-              thresholdPanel
-            )}
-          </div>
-          <div className="mx-auto w-full max-w-[360px] lg:mx-0 lg:w-[260px] lg:shrink-0 xl:w-[300px] min-[1800px]:w-[360px] lg:pt-4 xl:pt-8">
-            {mode === 'calcul' ? (
-              <section className="bg-white border-2 border-grey rounded-2xl p-4 sm:p-6 md:p-8 shadow-sm animate-fade-in-up min-h-[220px] flex items-center justify-center">
-                {allOutputsDone ? (
-                  networkDecision.status === 'clear' ? (
-                    <div className="text-center space-y-4">
-                      <h2 className="text-darkBlue text-2xl font-bold tracking-wide">
-                        Décision finale
-                      </h2>
-                      <div
-                        className={`text-7xl font-bold ${
-                          networkDecision.digit === selectedDigit
-                            ? 'text-green'
-                            : 'text-red'
-                        }`}
-                      >
-                        {networkDecision.digit}
-                      </div>
-                      <div
-                        className={`text-lg font-medium ${
-                          networkDecision.digit === selectedDigit
-                            ? 'text-green'
-                            : 'text-red'
-                        }`}
-                      >
-                        {networkDecision.digit === selectedDigit
-                          ? '✓ Reconnaissance réussie !'
-                          : `✗ Erreur : ${selectedDigit} reconnu comme ${networkDecision.digit}`}
-                      </div>
-                    </div>
-                  ) : networkDecision.status === 'ambiguous' ? (
-                    <div className="text-center space-y-4">
-                      <h2 className="text-darkBlue text-2xl font-bold tracking-wide">
-                        Décision finale
-                      </h2>
-                      <p className="text-3xl font-bold text-yellow-hover">
-                        Ambiguïté
-                      </p>
-                      <p className="text-lg font-semibold text-darkBlue">
-                        {formatAmbiguityMessage(networkDecision.digits)}
-                      </p>
-                      <p className="text-sm font-medium text-astro">
-                        {selectedDigit != null &&
-                        networkDecision.digits.includes(selectedDigit)
-                          ? `Le chiffre attendu (${selectedDigit}) fait partie des candidats actifs, mais le réseau ne tranche pas.`
-                          : selectedDigit != null
-                            ? `Le chiffre attendu (${selectedDigit}) ne correspond pas à cette ambiguïté.`
-                            : null}
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="text-center space-y-4">
-                      <h2 className="text-darkBlue text-2xl font-bold tracking-wide">
-                        Décision finale
-                      </h2>
-                      <p className="text-lg font-semibold text-astro">
-                        Aucun chiffre reconnu
-                      </p>
-                      <p className="text-sm font-medium text-astro">
-                        Aucun neurone de sortie n&apos;est activé (sortie &gt; 0).
-                      </p>
-                    </div>
-                  )
-                ) : (
-                  <div className="text-center">
-                    <h2 className="text-darkBlue text-2xl font-bold tracking-wide mb-3">
-                      Décision finale
-                    </h2>
-                    <p className="text-astro font-medium">
-                      Validez les neurones de sortie pour afficher le résultat.
-                    </p>
-                  </div>
-                )}
-              </section>
-            ) : null}
-          </div>
->>>>>>> refs/remotes/origin/main
         </div>
       </div>
       <div className="text-center mt-8">

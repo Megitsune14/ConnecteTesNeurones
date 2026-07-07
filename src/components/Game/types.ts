@@ -34,7 +34,6 @@ export interface NetworkVisualizationProps {
   onAutoCalculateOutput: () => void
   /** Grille 9×6 affichée à gauche du réseau (parcours intégré). */
   pattern?: number[][] | null
-  finalDecision?: number | null
   selectedDigit?: number | null
 }
 
