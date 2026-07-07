@@ -11,8 +11,10 @@ import ThresholdDigitSidePanel from '../ThresholdDigitSidePanel'
 import MiniDigitGrid from '../MiniDigitGrid'
 import { useSessionDigits } from '../sessionDigits'
 import {
+  formatAmbiguityMessage,
   getOutputVerdictLabel,
-  resolveWinningDigit,
+  resolveNetworkDecision,
+  type NetworkDecision,
   type OutputActivation,
 } from '../networkDecision'
 
@@ -46,7 +48,7 @@ interface NetworkInteractionStepProps {
   onNeuronClick: (neuronId: string) => void
   onAutoCalculateHidden: () => void
   onAutoCalculateOutput: () => void
-  finalDecision: number | null
+  networkDecision: NetworkDecision
   selectedDigit: number | null
   onReset: () => void
   onApplySeuilThreshold: (neuronId: string, threshold: number) => void
@@ -61,7 +63,7 @@ const NetworkInteractionStep = ({
   onNeuronClick,
   onAutoCalculateHidden,
   onAutoCalculateOutput,
-  finalDecision,
+  networkDecision,
   selectedDigit,
   onReset,
   onApplySeuilThreshold,
@@ -100,18 +102,17 @@ const NetworkInteractionStep = ({
     const neuron = outputNeurons.find((n) => n.id === outputId)
     return neuron?.outputValidated === true
   })
-  const winningDigit = resolveWinningDigit(
-    NETWORK_STRUCTURE.output
-      .map((outputId) => outputNeurons.find((n) => n.id === outputId))
-      .filter((n): n is NeuronData => n != null && n.outputValidated)
-      .map(
-        (n): OutputActivation => ({
-          digit:
-            n.digit ?? (parseInt(n.id.replace('NEURONE', ''), 10) || 0),
-          value: n.calculatedOutput ?? 0,
-        })
-      )
-  )
+  const outputActivations: OutputActivation[] = NETWORK_STRUCTURE.output
+    .map((outputId) => outputNeurons.find((n) => n.id === outputId))
+    .filter((n): n is NeuronData => n != null && n.outputValidated)
+    .map((n) => ({
+      digit: n.digit ?? (parseInt(n.id.replace('NEURONE', ''), 10) || 0),
+      value: n.calculatedOutput ?? 0,
+    }))
+
+  const localNetworkDecision = allOutputsDone
+    ? resolveNetworkDecision(outputActivations)
+    : networkDecision
 
   useEffect(() => {
     setThresholdValues((prev) => {
@@ -204,7 +205,17 @@ const NetworkInteractionStep = ({
         </button>
       </div>
 
-      {thresholdLayer === 'output' && allOutputsDone && winningDigit === null && (
+      {thresholdLayer === 'output' &&
+        allOutputsDone &&
+        localNetworkDecision.status === 'ambiguous' && (
+        <p className="mb-4 rounded-xl border border-yellow-hover/60 bg-yellow/15 px-4 py-3 text-center text-sm font-semibold text-darkBlue">
+          {formatAmbiguityMessage(localNetworkDecision.digits)}
+        </p>
+      )}
+
+      {thresholdLayer === 'output' &&
+        allOutputsDone &&
+        localNetworkDecision.status === 'none' && (
         <p className="mb-4 rounded-xl border border-grey bg-gray-50 px-4 py-3 text-center text-sm font-semibold text-astro">
           Aucun chiffre reconnu
         </p>
@@ -293,9 +304,10 @@ const NetworkInteractionStep = ({
             parsedTerms.length > 0
               ? `${calcParts.join('')} = ${computedFromFormula}`
               : `${displayedSum}`
-          const outputVerdict = getOutputVerdictLabel(neuronDigit, winningDigit, {
+          const outputVerdict = getOutputVerdictLabel(neuronDigit, localNetworkDecision, {
             allOutputsValidated: allOutputsDone,
             neuronValidated: neuron.outputValidated,
+            activation: neuron.calculatedOutput ?? 0,
           })
 
           return (
@@ -451,7 +463,11 @@ const NetworkInteractionStep = ({
               {outputVerdict && thresholdLayer === 'output' && (
                 <p
                   className={`mt-3 text-center text-sm font-semibold ${
-                    outputVerdict.startsWith('✓') ? 'text-green' : 'text-red'
+                    outputVerdict.startsWith('✓')
+                      ? 'text-green'
+                      : outputVerdict.startsWith('↔')
+                        ? 'text-darkBlue'
+                        : 'text-red'
                   }`}
                 >
                   {outputVerdict}
@@ -524,6 +540,99 @@ const NetworkInteractionStep = ({
           ) : (
             thresholdPanel
           )}
+<<<<<<< HEAD
+=======
+          <div className="mx-auto w-full min-w-0 max-w-full lg:mx-0 lg:min-w-[280px] lg:flex-1 xl:max-w-[680px] min-[1800px]:max-w-[980px]">
+            {mode === 'calcul' ? (
+              <NetworkVisualization
+                inputNeurons={inputNeurons}
+                hiddenNeurons={hiddenNeurons}
+                outputNeurons={outputNeurons}
+                onNeuronClick={onNeuronClick}
+                onAutoCalculateHidden={onAutoCalculateHidden}
+                onAutoCalculateOutput={onAutoCalculateOutput}
+              />
+            ) : (
+              thresholdPanel
+            )}
+          </div>
+          <div className="mx-auto w-full max-w-[360px] lg:mx-0 lg:w-[260px] lg:shrink-0 xl:w-[300px] min-[1800px]:w-[360px] lg:pt-4 xl:pt-8">
+            {mode === 'calcul' ? (
+              <section className="bg-white border-2 border-grey rounded-2xl p-4 sm:p-6 md:p-8 shadow-sm animate-fade-in-up min-h-[220px] flex items-center justify-center">
+                {allOutputsDone ? (
+                  networkDecision.status === 'clear' ? (
+                    <div className="text-center space-y-4">
+                      <h2 className="text-darkBlue text-2xl font-bold tracking-wide">
+                        Décision finale
+                      </h2>
+                      <div
+                        className={`text-7xl font-bold ${
+                          networkDecision.digit === selectedDigit
+                            ? 'text-green'
+                            : 'text-red'
+                        }`}
+                      >
+                        {networkDecision.digit}
+                      </div>
+                      <div
+                        className={`text-lg font-medium ${
+                          networkDecision.digit === selectedDigit
+                            ? 'text-green'
+                            : 'text-red'
+                        }`}
+                      >
+                        {networkDecision.digit === selectedDigit
+                          ? '✓ Reconnaissance réussie !'
+                          : `✗ Erreur : ${selectedDigit} reconnu comme ${networkDecision.digit}`}
+                      </div>
+                    </div>
+                  ) : networkDecision.status === 'ambiguous' ? (
+                    <div className="text-center space-y-4">
+                      <h2 className="text-darkBlue text-2xl font-bold tracking-wide">
+                        Décision finale
+                      </h2>
+                      <p className="text-3xl font-bold text-yellow-hover">
+                        Ambiguïté
+                      </p>
+                      <p className="text-lg font-semibold text-darkBlue">
+                        {formatAmbiguityMessage(networkDecision.digits)}
+                      </p>
+                      <p className="text-sm font-medium text-astro">
+                        {selectedDigit != null &&
+                        networkDecision.digits.includes(selectedDigit)
+                          ? `Le chiffre attendu (${selectedDigit}) fait partie des candidats actifs, mais le réseau ne tranche pas.`
+                          : selectedDigit != null
+                            ? `Le chiffre attendu (${selectedDigit}) ne correspond pas à cette ambiguïté.`
+                            : null}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="text-center space-y-4">
+                      <h2 className="text-darkBlue text-2xl font-bold tracking-wide">
+                        Décision finale
+                      </h2>
+                      <p className="text-lg font-semibold text-astro">
+                        Aucun chiffre reconnu
+                      </p>
+                      <p className="text-sm font-medium text-astro">
+                        Aucun neurone de sortie n&apos;est activé (sortie &gt; 0).
+                      </p>
+                    </div>
+                  )
+                ) : (
+                  <div className="text-center">
+                    <h2 className="text-darkBlue text-2xl font-bold tracking-wide mb-3">
+                      Décision finale
+                    </h2>
+                    <p className="text-astro font-medium">
+                      Validez les neurones de sortie pour afficher le résultat.
+                    </p>
+                  </div>
+                )}
+              </section>
+            ) : null}
+          </div>
+>>>>>>> refs/remotes/origin/main
         </div>
       </div>
       <div className="text-center mt-8">

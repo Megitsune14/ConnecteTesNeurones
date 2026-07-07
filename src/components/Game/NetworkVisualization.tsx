@@ -4,8 +4,10 @@ import type { NetworkVisualizationProps } from './types'
 import { NETWORK_STRUCTURE } from './constants'
 import {
   getOutputVerdictLabel,
-  resolveWinningDigit,
+  getOutputVerdictOutcome,
+  resolveNetworkDecision,
   type OutputActivation,
+  type VerdictOutcome,
 } from './networkDecision'
 import type { NeuronData } from './types'
 
@@ -129,6 +131,13 @@ const CYTOSCAPE_STYLE = [
     selector: 'node[type = "verdict"][outcome = "winner"]',
     style: {
       color: '#00A19A',
+      'font-weight': 'bold',
+    },
+  },
+  {
+    selector: 'node[type = "verdict"][outcome = "ambiguous"]',
+    style: {
+      color: '#E6A800',
       'font-weight': 'bold',
     },
   },
@@ -348,7 +357,7 @@ const NetworkVisualization = ({
     outputNeurons.length > 0 &&
     outputNeurons.every((n) => n.outputValidated)
 
-  const winningDigit = resolveWinningDigit(
+  const networkDecision = resolveNetworkDecision(
     NETWORK_STRUCTURE.output
       .map((outputId) => outputNeurons.find((n) => n.id === outputId))
       .filter((n): n is NeuronData => n != null && n.outputValidated)
@@ -546,15 +555,20 @@ const NetworkVisualization = ({
       const isValidated = neuron?.outputValidated ?? false
 
       let label = ''
-      let outcome: 'winner' | 'loser' = 'loser'
+      let outcome: VerdictOutcome = 'loser'
 
       if (isValidated && allOutputsValidated) {
-        const labelText = getOutputVerdictLabel(digit, winningDigit, {
+        const labelText = getOutputVerdictLabel(digit, networkDecision, {
           allOutputsValidated: true,
           neuronValidated: true,
+          activation: value,
+          labelStyle: 'compact',
         })
-        const isWinner = winningDigit !== null && digit === winningDigit
-        outcome = isWinner ? 'winner' : 'loser'
+        outcome = getOutputVerdictOutcome(digit, networkDecision, {
+          allOutputsValidated: true,
+          neuronValidated: true,
+          activation: value,
+        })
         label = labelText ?? ''
       }
 
@@ -716,15 +730,21 @@ const NetworkVisualization = ({
         const verdictNode = cy.getElementById(`${id}_VERDICT`)
         if (verdictNode.length > 0) {
           let label = ''
-          let outcome: 'winner' | 'loser' = 'loser'
+          let outcome: VerdictOutcome = 'loser'
           const isValidated = neuron?.outputValidated ?? false
           if (isValidated && allOutputsValidated) {
-            const labelText = getOutputVerdictLabel(digit, winningDigit, {
+            const activation = neuron?.calculatedOutput ?? 0
+            const labelText = getOutputVerdictLabel(digit, networkDecision, {
               allOutputsValidated: true,
               neuronValidated: true,
+              activation,
+              labelStyle: 'compact',
             })
-            const isWinner = winningDigit !== null && digit === winningDigit
-            outcome = isWinner ? 'winner' : 'loser'
+            outcome = getOutputVerdictOutcome(digit, networkDecision, {
+              allOutputsValidated: true,
+              neuronValidated: true,
+              activation,
+            })
             label = labelText ?? ''
           }
           verdictNode.data('label', label)
