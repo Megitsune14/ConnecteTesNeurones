@@ -12,86 +12,6 @@ import type { NeuronData } from './types'
 const COLUMN_SPACING = 600
 const NODE_SPACING = 140
 const START_Y = 100
-const GRID_COLUMN = -720
-const DECISION_COLUMN = COLUMN_SPACING * 2 + 420
-const GRID_NODE_ID = 'START_GRID'
-const DECISION_NODE_ID = 'FINAL_DECISION'
-const FLOW_ANCHOR_AFTER_GRID = 'FLOW_ANCHOR_AFTER_GRID'
-const FLOW_ANCHOR_BEFORE_DECISION = 'FLOW_ANCHOR_BEFORE_DECISION'
-
-function patternToGridDataUrl(pattern: number[][]): string {
-  const cellPx = 7
-  const sepPx = 2
-  const groupW = cellPx * 2 + sepPx
-  const groupH = cellPx * 3 + sepPx
-  const width = groupW * 3 - sepPx
-  const height = groupH * 3 - sepPx
-
-  const canvas = document.createElement('canvas')
-  canvas.width = width
-  canvas.height = height
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return ''
-
-  ctx.fillStyle = '#EBEBEC'
-  ctx.fillRect(0, 0, width, height)
-
-  for (let ligGroup = 0; ligGroup < 3; ligGroup++) {
-    for (let ligRow = 0; ligRow < 3; ligRow++) {
-      for (let colGroup = 0; colGroup < 3; colGroup++) {
-        for (let colCol = 0; colCol < 2; colCol++) {
-          const gridRow = ligGroup * 3 + ligRow
-          const gridCol = colGroup * 2 + colCol
-          const x = colGroup * groupW + colCol * cellPx
-          const y = ligGroup * groupH + ligRow * cellPx
-          if (pattern[gridRow]?.[gridCol] === 1) {
-            ctx.fillStyle = '#000'
-            ctx.fillRect(x, y, cellPx, cellPx)
-          }
-        }
-      }
-    }
-  }
-
-  ctx.fillStyle = '#DC143C'
-  ctx.fillRect(groupW, 0, sepPx, height)
-  ctx.fillRect(groupW * 2, 0, sepPx, height)
-
-  ctx.fillStyle = '#F9BB12'
-  ctx.fillRect(0, groupH, width, sepPx)
-  ctx.fillRect(0, groupH * 2, width, sepPx)
-
-  return canvas.toDataURL()
-}
-
-function buildDecisionNodeData(
-  allOutputsValidated: boolean,
-  finalDecision: number | null | undefined,
-  selectedDigit: number | null | undefined
-): { label: string; outcome: string } {
-  if (!allOutputsValidated) {
-    return {
-      label: 'Décision finale\n\nValidez les neurones\nde sortie',
-      outcome: 'pending',
-    }
-  }
-  if (finalDecision == null) {
-    return {
-      label: 'Décision finale\n\nAucun chiffre\nreconnu',
-      outcome: 'none',
-    }
-  }
-  if (finalDecision === selectedDigit) {
-    return {
-      label: `Décision finale\n\n${finalDecision}\n\n✓ Reconnaissance\nréussie !`,
-      outcome: 'success',
-    }
-  }
-  return {
-    label: `Décision finale\n\n${finalDecision}\n\n✗ Erreur :\n${selectedDigit} → ${finalDecision}`,
-    outcome: 'error',
-  }
-}
 
 const CYTOSCAPE_STYLE = [
   {
@@ -218,77 +138,6 @@ const CYTOSCAPE_STYLE = [
     },
   },
   {
-    selector: 'node[type = "grid"]',
-    style: {
-      width: 200,
-      height: 260,
-      shape: 'round-rectangle',
-      'background-color': '#F9FAFB',
-      'border-width': 2,
-      'border-color': '#EBEBEC',
-      'background-image': 'data(image)',
-      'background-fit': 'contain',
-      'background-width': '88%',
-      'background-height': '72%',
-      'background-position-y': '58%',
-      label: 'data(label)',
-      'font-size': '16px',
-      'font-weight': 'bold',
-      'text-valign': 'top',
-      'text-margin-y': 10,
-      color: '#1A182D',
-    },
-  },
-  {
-    selector: 'node[type = "decision"]',
-    style: {
-      width: 210,
-      height: 200,
-      shape: 'round-rectangle',
-      'background-color': '#fff',
-      'border-width': 3,
-      'border-color': '#24A1EB',
-      label: 'data(label)',
-      'font-size': '17px',
-      'font-weight': 'bold',
-      'text-wrap': 'wrap',
-      'text-max-width': '180px',
-      color: '#1A182D',
-      'text-valign': 'center',
-      'text-halign': 'center',
-    },
-  },
-  {
-    selector: 'node[type = "decision"][outcome = "success"]',
-    style: {
-      'border-color': '#00A19A',
-      color: '#00A19A',
-    },
-  },
-  {
-    selector: 'node[type = "decision"][outcome = "error"]',
-    style: {
-      'border-color': '#DC143C',
-      color: '#DC143C',
-    },
-  },
-  {
-    selector: 'node[type = "decision"][outcome = "none"]',
-    style: {
-      'border-color': '#6B7280',
-      color: '#1A182D',
-    },
-  },
-  {
-    selector: 'node[type = "decision"][outcome = "pending"]',
-    style: {
-      'border-color': '#EBEBEC',
-      color: '#6B7280',
-      'font-weight': 'normal',
-      'font-size': '15px',
-    },
-  },
-  {
     selector: 'edge',
     style: {
       width: 2,
@@ -297,30 +146,6 @@ const CYTOSCAPE_STYLE = [
       'target-arrow-color': '#24A1EB',
       'target-arrow-shape': 'triangle',
       'curve-style': 'bezier',
-    },
-  },
-  {
-    selector: 'node[type = "flow-anchor"]',
-    style: {
-      width: 1,
-      height: 1,
-      'background-opacity': 0,
-      'border-width': 0,
-      label: '',
-      events: 'no',
-    },
-  },
-  {
-    selector: 'edge[flow = "true"]',
-    style: {
-      width: 2.5,
-      'line-style': 'solid',
-      'line-color': '#9CA3AF',
-      opacity: 0.55,
-      'target-arrow-color': '#9CA3AF',
-      'target-arrow-shape': 'triangle',
-      'arrow-scale': 1.4,
-      'curve-style': 'straight',
     },
   },
 ]
@@ -332,9 +157,6 @@ const NetworkVisualization = ({
   onNeuronClick,
   onAutoCalculateHidden,
   onAutoCalculateOutput,
-  pattern = null,
-  finalDecision = null,
-  selectedDigit = null,
 }: NetworkVisualizationProps) => {
   const cyRef = useRef<cytoscape.Core | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -440,69 +262,6 @@ const NetworkVisualization = ({
     })
 
     const outputStartY = START_Y + ((6 - 4) / 2) * NODE_SPACING
-    const integratedCenterY = START_Y + (2.5 * NODE_SPACING)
-    const showIntegrated = pattern != null
-
-    const gridNode = showIntegrated
-      ? [
-          {
-            data: {
-              id: GRID_NODE_ID,
-              label: 'Grille de départ',
-              type: 'grid',
-              layer: 'grid',
-              image: patternToGridDataUrl(pattern),
-            },
-            position: { x: GRID_COLUMN, y: integratedCenterY },
-            locked: true,
-          },
-        ]
-      : []
-
-    const decisionData = buildDecisionNodeData(
-      allOutputsValidated,
-      finalDecision,
-      selectedDigit
-    )
-    const decisionNode = showIntegrated
-      ? [
-          {
-            data: {
-              id: FLOW_ANCHOR_AFTER_GRID,
-              type: 'flow-anchor',
-              layer: 'flow',
-            },
-            position: { x: GRID_COLUMN / 2, y: integratedCenterY },
-            locked: true,
-          },
-          {
-            data: {
-              id: FLOW_ANCHOR_BEFORE_DECISION,
-              type: 'flow-anchor',
-              layer: 'flow',
-            },
-            position: {
-              x: COLUMN_SPACING * 2 + 260,
-              y: outputStartY + 1.5 * NODE_SPACING,
-            },
-            locked: true,
-          },
-          {
-            data: {
-              id: DECISION_NODE_ID,
-              label: decisionData.label,
-              type: 'decision',
-              layer: 'decision',
-              outcome: decisionData.outcome,
-            },
-            position: {
-              x: DECISION_COLUMN,
-              y: outputStartY + 1.5 * NODE_SPACING,
-            },
-            locked: true,
-          },
-        ]
-      : []
     const outputNodes = NETWORK_STRUCTURE.output.map((id, index) => {
       const neuron = outputValuesMap.get(id)
       const needsWarn = neuron?.needsRecalculation === true
@@ -610,40 +369,12 @@ const NetworkVisualization = ({
       }
     }
     const edges = [...inputToHiddenEdges, ...hiddenToOutputEdges]
-    const flowEdges = showIntegrated
-      ? [
-          {
-            data: {
-              id: 'FLOW-GRID-TO-NETWORK',
-              source: GRID_NODE_ID,
-              target: FLOW_ANCHOR_AFTER_GRID,
-              flow: 'true',
-            },
-          },
-          {
-            data: {
-              id: 'FLOW-NETWORK-TO-DECISION',
-              source: FLOW_ANCHOR_BEFORE_DECISION,
-              target: DECISION_NODE_ID,
-              flow: 'true',
-            },
-          },
-        ]
-      : []
-    const nodes = [
-      ...gridNode,
-      ...inputNodes,
-      ...hiddenNodes,
-      ...outputNodes,
-      ...outputVerdictNodes,
-      ...decisionNode,
-    ]
-    const allEdges = [...edges, ...flowEdges]
+    const nodes = [...inputNodes, ...hiddenNodes, ...outputNodes, ...outputVerdictNodes]
 
     if (!cyRef.current) {
       cyRef.current = cytoscape({
         container: containerRef.current,
-        elements: [...nodes, ...allEdges],
+        elements: [...nodes, ...edges],
         style: CYTOSCAPE_STYLE as any,
         layout: { name: 'preset' },
         zoomingEnabled: true,
@@ -733,26 +464,9 @@ const NetworkVisualization = ({
           verdictNode.data('value', neuron?.calculatedOutput ?? 0)
         }
       }
-      if (showIntegrated) {
-        const gridNodeEl = cy.getElementById(GRID_NODE_ID)
-        if (gridNodeEl.length > 0 && pattern) {
-          gridNodeEl.data('image', patternToGridDataUrl(pattern))
-        }
-        const nextDecision = buildDecisionNodeData(
-          allOutputsValidated,
-          finalDecision,
-          selectedDigit
-        )
-        const decisionNodeEl = cy.getElementById(DECISION_NODE_ID)
-        if (decisionNodeEl.length > 0) {
-          decisionNodeEl.data('label', nextDecision.label)
-          decisionNodeEl.data('outcome', nextDecision.outcome)
-        }
-      }
-      for (const edge of allEdges) {
+      for (const edge of edges) {
         const edgeElement = cy.getElementById(edge.data.id)
         if (edgeElement.length > 0) {
-          if ('flow' in edge.data && edge.data.flow === 'true') continue
           const sourceNode = cy.getElementById(edge.data.source)
           if (sourceNode.length > 0) {
             const sourceValue = sourceNode.data('value') ?? 0
@@ -765,15 +479,7 @@ const NetworkVisualization = ({
       }
       cy.style().update()
     }
-  }, [
-    inputNeurons,
-    hiddenNeurons,
-    outputNeurons,
-    onNeuronClick,
-    pattern,
-    finalDecision,
-    selectedDigit,
-  ])
+  }, [inputNeurons, hiddenNeurons, outputNeurons, onNeuronClick])
 
   useEffect(() => {
     const container = containerRef.current
@@ -797,15 +503,13 @@ const NetworkVisualization = ({
   return (
     <section className="bg-white border-2 border-grey rounded-2xl p-4 sm:p-6 min-[1800px]:p-8 shadow-sm animate-fade-in-up">
       <h2 className="text-darkBlue text-2xl min-[1800px]:text-3xl font-bold tracking-wide mb-4 min-[1800px]:mb-6 text-center">
-        {pattern != null
-          ? 'De la grille au réseau'
-          : 'Réseau de neurones'}
+        Réseau de neurones
       </h2>
       <div className="space-y-4 min-[1800px]:space-y-6">
         <p className="text-astro text-center text-base min-[1800px]:text-lg font-medium leading-relaxed">
-          {pattern != null
-            ? 'Suivez le parcours : grille dessinée, comptage des pixels, calculs des neurones, puis décision finale.'
-            : 'Cliquez sur un neurone caché (A-F) puis de sortie (0, 3, 6, 9) pour effectuer les calculs. Les neurones validés apparaissent en vert avec leur valeur de sortie.'}
+          Cliquez sur un neurone caché (A-F) puis de sortie (0, 3, 6, 9) pour
+          effectuer les calculs. Les neurones validés apparaissent en vert avec
+          leur valeur de sortie.
         </p>
         <div
           ref={containerRef}

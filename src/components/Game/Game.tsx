@@ -5,7 +5,7 @@ import NeuronPanel from './NeuronPanel'
 import DigitSelectionStep from './steps/DigitSelectionStep'
 import GridDivisionStep from './steps/GridDivisionStep'
 import PixelCountingStep from './steps/PixelCountingStep'
-import NetworkInteractionStep from './steps/NetworkInteractionStep'
+import NetworkInteractionStep from './steps/NetworkInteractionStep.old'
 
 const Game = () => {
   const navigate = useNavigate()

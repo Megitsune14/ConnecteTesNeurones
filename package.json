@@ -24,7 +24,7 @@
     "@types/cytoscape": "^3.19.0",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
-    "@vitejs/plugin-react": "^4.3.4",
+    "@vitejs/plugin-react": "^6.0.2",
     "autoprefixer": "^10.4.21",
     "eslint": "^9.22.0",
     "eslint-plugin-react-hooks": "^5.2.0",
@@ -33,6 +33,6 @@
     "postcss": "^8.5.6",
     "serve": "^14.2.4",
     "typescript": "^5.9.2",
-    "vite": "^6.3.1"
+    "vite": "^8.0.16"
   }
 }

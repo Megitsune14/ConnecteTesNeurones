@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { InputNeuronData, NeuronData } from '../types'
-import NetworkVisualization from '../NetworkVisualization'
+import NetworkVisualization from '../NetworkVisualization.old'
 import { NETWORK_STRUCTURE, NEURONE_FORMULAS } from '../constants'
 import {
   DIGIT_MARK_BADGE_CLASSES,
@@ -15,6 +15,36 @@ import {
   resolveWinningDigit,
   type OutputActivation,
 } from '../networkDecision'
+
+/** Mini-grille « Grille de départ » : même logique que la division 9×6, cellules 28px. */
+const PREVIEW_CELL_PX = 28
+const PREVIEW_COL_GROUP_W = PREVIEW_CELL_PX * 2
+const PREVIEW_SEP_MARGIN_PX = 2
+const PREVIEW_SEP_W_PX = 3
+const PREVIEW_V_LINE_LEFT = [
+  PREVIEW_COL_GROUP_W + PREVIEW_SEP_MARGIN_PX,
+  PREVIEW_COL_GROUP_W +
+    PREVIEW_SEP_MARGIN_PX +
+    PREVIEW_SEP_W_PX +
+    PREVIEW_SEP_MARGIN_PX +
+    PREVIEW_COL_GROUP_W +
+    PREVIEW_SEP_MARGIN_PX,
+] as const
+const PREVIEW_ROWS_PER_BAND = 3
+const PREVIEW_H_BAND_PX = PREVIEW_ROWS_PER_BAND * PREVIEW_CELL_PX
+const PREVIEW_H_SEP_BEFORE_PX = PREVIEW_SEP_MARGIN_PX
+const PREVIEW_H_LINE_TOP = [
+  PREVIEW_H_BAND_PX + PREVIEW_H_SEP_BEFORE_PX,
+  PREVIEW_H_BAND_PX +
+    (PREVIEW_SEP_MARGIN_PX * 2 + PREVIEW_SEP_W_PX) +
+    PREVIEW_H_BAND_PX +
+    PREVIEW_H_SEP_BEFORE_PX,
+] as const
+/** Débords des lignes de séparation (mini-grille). Bas du rouge réduit pour rester dans le cadre. */
+const PREVIEW_V_EXTEND_TOP_PX = 36
+const PREVIEW_V_EXTEND_BOTTOM_PX = 0
+const PREVIEW_H_EXTEND_LEFT_PX = 56
+const PREVIEW_H_EXTEND_RIGHT_PX = 0
 
 type ParsedTerm = {
   id: string
@@ -165,6 +195,148 @@ const NetworkInteractionStep = ({
     if (pattern == null || selectedDigit == null) return
     saveDigit(selectedDigit, pattern)
   }
+
+  const beforePanel = (
+    <section className="bg-white border-2 border-grey rounded-2xl p-4 sm:p-6 md:p-8 shadow-sm animate-fade-in-up">
+      <h2 className="text-darkBlue text-2xl font-bold tracking-wide mb-6 text-center">
+        Grille de départ
+      </h2>
+      <div className="flex justify-center">
+        {pattern != null ? (
+          <div className="relative inline-block">
+            <div className="border-4 border-grey rounded-2xl p-2 bg-gray-50 shadow-sm relative overflow-visible">
+              <div
+                className="absolute left-14 top-2 grid items-center"
+                style={{ gridTemplateColumns: '56px 7px 56px 7px 56px' }}
+              >
+                {[0, 1, 2].map((colGroup) => (
+                  <div
+                    key={`col-label-${colGroup}`}
+                    className="text-darkBlue font-bold text-xs text-center"
+                    style={{ gridColumnStart: colGroup * 2 + 1 }}
+                  >
+                    {`COL${colGroup + 1}`}
+                  </div>
+                ))}
+              </div>
+              <div className="absolute left-2 top-8">
+                <div
+                  className="absolute left-0 -translate-y-1/2 text-darkBlue font-bold text-xs"
+                  style={{ top: '42px' }}
+                >
+                  LIG1
+                </div>
+                <div
+                  className="absolute left-0 -translate-y-1/2 text-darkBlue font-bold text-xs"
+                  style={{ top: '133px' }}
+                >
+                  LIG2
+                </div>
+                <div
+                  className="absolute left-0 -translate-y-1/2 text-darkBlue font-bold text-xs"
+                  style={{ top: '224px' }}
+                >
+                  LIG3
+                </div>
+              </div>
+              <div className="relative ml-12 mt-7 flex flex-col gap-0 overflow-visible">
+                <div
+                  className="pointer-events-none absolute inset-0 z-[6] overflow-visible"
+                  aria-hidden
+                >
+                  {PREVIEW_V_LINE_LEFT.map((left) => (
+                    <div
+                      key={`preview-v-${left}`}
+                      className="absolute bg-red"
+                      style={{
+                        left,
+                        width: PREVIEW_SEP_W_PX,
+                        top: -PREVIEW_V_EXTEND_TOP_PX,
+                        height: `calc(100% + ${PREVIEW_V_EXTEND_TOP_PX + PREVIEW_V_EXTEND_BOTTOM_PX}px)`,
+                      }}
+                    />
+                  ))}
+                  {PREVIEW_H_LINE_TOP.map((top) => (
+                    <div
+                      key={`preview-h-${top}`}
+                      className="absolute bg-yellow"
+                      style={{
+                        left: -PREVIEW_H_EXTEND_LEFT_PX,
+                        width: `calc(100% + ${PREVIEW_H_EXTEND_LEFT_PX + PREVIEW_H_EXTEND_RIGHT_PX}px)`,
+                        top,
+                        height: PREVIEW_SEP_W_PX,
+                      }}
+                    />
+                  ))}
+                </div>
+                {[0, 1, 2].map((ligGroup) => (
+                  <div key={`lig-${ligGroup}`} className="flex flex-col gap-0">
+                    {Array.from({ length: 3 }).map((_, ligRow) => {
+                      const gridRow = ligGroup * 3 + ligRow
+                      return (
+                        <div key={`row-${gridRow}`} className="flex gap-0 relative">
+                          {[0, 1, 2].map((colGroup) => (
+                            <div key={`col-${colGroup}`} className="flex gap-0 relative">
+                              <div className="flex gap-0 relative">
+                                {Array.from({ length: 2 }).map((_, colCol) => {
+                                  const gridCol = colGroup * 2 + colCol
+                                  const pixel = pattern[gridRow]?.[gridCol] ?? 0
+                                  return (
+                                    <div
+                                      key={`${gridRow}-${gridCol}`}
+                                      className="relative border border-black/20 bg-grey/40"
+                                      style={{
+                                        width: PREVIEW_CELL_PX,
+                                        height: PREVIEW_CELL_PX,
+                                      }}
+                                    >
+                                      {pixel === 1 && (
+                                        <div className="absolute inset-0 bg-black border border-black/50 z-[2]" />
+                                      )}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                              {colGroup < 2 && (
+                                <div
+                                  className="shrink-0"
+                                  style={{
+                                    width: PREVIEW_SEP_W_PX,
+                                    marginLeft: PREVIEW_SEP_MARGIN_PX,
+                                    marginRight: PREVIEW_SEP_MARGIN_PX,
+                                  }}
+                                  aria-hidden
+                                />
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    })}
+                    {ligGroup < 2 && (
+                      <div
+                        className="shrink-0"
+                        style={{
+                          height: PREVIEW_SEP_W_PX,
+                          marginTop: PREVIEW_SEP_MARGIN_PX,
+                          marginBottom: PREVIEW_SEP_MARGIN_PX,
+                        }}
+                        aria-hidden
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p className="text-astro font-medium text-center">
+            Aucune grille disponible.
+          </p>
+        )}
+      </div>
+    </section>
+  )
 
   const thresholdPanel = (
     <section className="bg-white border-2 border-grey rounded-2xl p-4 sm:p-6 shadow-sm animate-fade-in-up">
@@ -508,22 +680,80 @@ const NetworkInteractionStep = ({
         </button>
       </div>
       <div className="w-full min-w-0 overflow-x-auto pb-2">
-        <div className="mx-auto w-full min-w-0 max-w-full min-[1800px]:max-w-[1400px]">
+        <div className="flex w-full min-w-0 max-w-full flex-col items-stretch gap-6 lg:flex-row lg:items-start lg:gap-4 xl:gap-6">
           {mode === 'calcul' ? (
-            <NetworkVisualization
-              inputNeurons={inputNeurons}
-              hiddenNeurons={hiddenNeurons}
-              outputNeurons={outputNeurons}
-              onNeuronClick={onNeuronClick}
-              onAutoCalculateHidden={onAutoCalculateHidden}
-              onAutoCalculateOutput={onAutoCalculateOutput}
-              pattern={pattern}
-              finalDecision={finalDecision}
-              selectedDigit={selectedDigit}
-            />
+            <div className="mx-auto w-full max-w-[360px] lg:mx-0 lg:w-[260px] lg:shrink-0 xl:w-[300px] min-[1800px]:w-[360px] lg:pt-4 xl:pt-8">
+              {beforePanel}
+            </div>
           ) : (
-            thresholdPanel
+            <div className="hidden lg:block lg:w-[260px] lg:shrink-0 xl:w-[300px] min-[1800px]:w-[360px] lg:pt-4 xl:pt-8" />
           )}
+          <div className="mx-auto w-full min-w-0 max-w-full lg:mx-0 lg:min-w-[280px] lg:flex-1 xl:max-w-[680px] min-[1800px]:max-w-[980px]">
+            {mode === 'calcul' ? (
+              <NetworkVisualization
+                inputNeurons={inputNeurons}
+                hiddenNeurons={hiddenNeurons}
+                outputNeurons={outputNeurons}
+                onNeuronClick={onNeuronClick}
+                onAutoCalculateHidden={onAutoCalculateHidden}
+                onAutoCalculateOutput={onAutoCalculateOutput}
+              />
+            ) : (
+              thresholdPanel
+            )}
+          </div>
+          <div className="mx-auto w-full max-w-[360px] lg:mx-0 lg:w-[260px] lg:shrink-0 xl:w-[300px] min-[1800px]:w-[360px] lg:pt-4 xl:pt-8">
+            {mode === 'calcul' ? (
+              <section className="bg-white border-2 border-grey rounded-2xl p-4 sm:p-6 md:p-8 shadow-sm animate-fade-in-up min-h-[220px] flex items-center justify-center">
+                {allOutputsDone ? (
+                  finalDecision !== null ? (
+                    <div className="text-center space-y-4">
+                      <h2 className="text-darkBlue text-2xl font-bold tracking-wide">
+                        Décision finale
+                      </h2>
+                      <div
+                        className={`text-7xl font-bold ${
+                          finalDecision === selectedDigit ? 'text-green' : 'text-red'
+                        }`}
+                      >
+                        {finalDecision}
+                      </div>
+                      <div
+                        className={`text-lg font-medium ${
+                          finalDecision === selectedDigit ? 'text-green' : 'text-red'
+                        }`}
+                      >
+                        {finalDecision === selectedDigit
+                          ? '✓ Reconnaissance réussie !'
+                          : `✗ Erreur : ${selectedDigit} reconnu comme ${finalDecision}`}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center space-y-4">
+                      <h2 className="text-darkBlue text-2xl font-bold tracking-wide">
+                        Décision finale
+                      </h2>
+                      <p className="text-lg font-semibold text-astro">
+                        Aucun chiffre reconnu
+                      </p>
+                      <p className="text-sm font-medium text-astro">
+                        Aucun neurone de sortie n&apos;est activé (sortie &gt; 0).
+                      </p>
+                    </div>
+                  )
+                ) : (
+                  <div className="text-center">
+                    <h2 className="text-darkBlue text-2xl font-bold tracking-wide mb-3">
+                      Décision finale
+                    </h2>
+                    <p className="text-astro font-medium">
+                      Validez les neurones de sortie pour afficher le résultat.
+                    </p>
+                  </div>
+                )}
+              </section>
+            ) : null}
+          </div>
         </div>
       </div>
       <div className="text-center mt-8">
