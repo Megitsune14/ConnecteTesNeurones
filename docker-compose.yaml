@@ -1,0 +1,35 @@
+# Stack par défaut (production). Usage : docker compose pull && docker compose up -d
+# Build image prod : docker compose build  (BASE_PATH=/APP_ID/ via build-arg)
+services:
+  app:
+    image: ${IMAGE_REGISTRY}/${IMAGE_NAME}:${IMAGE_VERSION}
+    container_name: ${APP_ID:-connectetesneurones}-app
+    restart: unless-stopped
+    pull_policy: always
+    environment:
+      PORT: "3000"
+      NODE_ENV: production
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.${APP_ID:-connectetesneurones}.tls=true"
+      - "traefik.http.routers.${APP_ID:-connectetesneurones}.service=${APP_ID:-connectetesneurones}-service"
+      - "traefik.http.routers.${APP_ID:-connectetesneurones}.entrypoints=web,websecure"
+      - "traefik.http.routers.${APP_ID:-connectetesneurones}.middlewares=${APP_ID:-connectetesneurones}-stripprefix"
+      - "traefik.http.routers.${APP_ID:-connectetesneurones}.rule=Host(`portail.terra-numerica.org`) && PathPrefix(`/${APP_ID:-connectetesneurones}`)"
+      - "traefik.http.services.${APP_ID:-connectetesneurones}-service.loadbalancer.server.port=3000"
+      - "traefik.http.middlewares.${APP_ID:-connectetesneurones}-stripprefix.stripprefix.prefixes=/${APP_ID:-connectetesneurones}"
+    networks:
+      - internal
+      - traefik
+
+networks:
+  internal:
+    driver: bridge
+  traefik:
+    external: true

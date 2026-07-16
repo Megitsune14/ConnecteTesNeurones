@@ -1,0 +1,18 @@
+# Surcharge développement local : build + serveur Vite + ports.
+# Usage : docker compose -f docker-compose.yaml -f docker-compose.dev.yaml up -d --build
+services:
+  app:
+    pull_policy: build
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    ports:
+      - "${PORT:-5173}:5173"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    labels:
+      - "traefik.enable=false"
+    networks: !override
+      internal: {}
