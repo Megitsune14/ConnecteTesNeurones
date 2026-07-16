@@ -19,6 +19,7 @@ VERSION?=$$(git describe --long 2>/dev/null | tr -d 'v' | cut -d- -f 1-2 | sed '
 SERVER_BACKEND_PATH  = /srv/$(APP_ID)/
 
 # Docker Compose : base = prod, surcharge dev en local
+COMPOSE_PROD = -f docker-compose.yaml
 COMPOSE_DEV = -f docker-compose.yaml -f docker-compose.dev.yaml
 
 # Variables SSH (doivent être fournies par l'utilisateur)
@@ -99,21 +100,41 @@ release: deploy update-service	## Publie, déploie et met à jour le service (co
 	@echo "--- Mise en production terminée avec succès ! ---"
 
 .PHONY: app-up
-app-up:					## Démarre l'application en local (docker-compose)
-	@echo "--- Démarrage du docker-compose en local ---"
+app-up:					## Démarre l'application en local (docker-compose prod)
+	@echo "--- Démarrage du docker-compose (prod) ---"
+	docker compose $(COMPOSE_PROD) -p $(APP_ID) up -d --build
+
+.PHONY: app-up-dev
+app-up-dev:				## Démarre l'application en local (docker-compose dev)
+	@echo "--- Démarrage du docker-compose (dev) ---"
 	docker compose $(COMPOSE_DEV) -p $(APP_ID) up -d --build
 
 .PHONY: app-down
-app-down:				## Arrête l'application en local (docker-compose)
-	@echo "--- Arrêt du docker-compose local ---"
+app-down:				## Arrête l'application en local (docker-compose prod)
+	@echo "--- Arrêt du docker-compose (prod) ---"
+	docker compose $(COMPOSE_PROD) -p $(APP_ID) down
+
+.PHONY: app-down-dev
+app-down-dev:				## Arrête l'application en local (docker-compose dev)
+	@echo "--- Arrêt du docker-compose (dev) ---"
 	docker compose $(COMPOSE_DEV) -p $(APP_ID) down
 
 .PHONY: app-logs
-app-logs:				## Affiche les logs de l'application en local (docker-compose)
-	@echo "--- Affichage des logs ---"
+app-logs:				## Affiche les logs de l'application en local (docker-compose prod)
+	@echo "--- Affichage des logs (prod) ---"
+	docker compose $(COMPOSE_PROD) -p $(APP_ID) logs -f app
+
+.PHONY: app-logs-dev
+app-logs-dev:				## Affiche les logs de l'application en local (docker-compose dev)
+	@echo "--- Affichage des logs (dev) ---"
 	docker compose $(COMPOSE_DEV) -p $(APP_ID) logs -f app
 
 .PHONY: app-ps
-app-ps:					## Affiche les conteneurs de l'application en local (docker-compose)
-	@echo "--- Conteneurs ---"
+app-ps:					## Affiche les conteneurs de l'application en local (docker-compose prod)
+	@echo "--- Conteneurs (prod) ---"
+	docker compose $(COMPOSE_PROD) -p $(APP_ID) ps
+
+.PHONY: app-ps-dev
+app-ps-dev:				## Affiche les conteneurs de l'application en local (docker-compose dev)
+	@echo "--- Conteneurs (dev) ---"
 	docker compose $(COMPOSE_DEV) -p $(APP_ID) ps
