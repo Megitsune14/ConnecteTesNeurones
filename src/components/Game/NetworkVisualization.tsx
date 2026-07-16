@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import cytoscape from 'cytoscape'
 import type { NetworkVisualizationProps } from './types'
 import { NETWORK_STRUCTURE } from './constants'
@@ -13,15 +13,257 @@ import {
 } from './networkDecision'
 import type { NeuronData } from './types'
 
-const COLUMN_SPACING = 600
-const NODE_SPACING = 140
-const START_Y = 100
-const GRID_COLUMN = -360
-const INPUT_FLOW_ANCHOR_X = -90
-const VERDICT_COLUMN = COLUMN_SPACING * 2 + 300
-/** Sortie du réseau : à droite des neurones de sortie, avant la décision. */
-const NETWORK_EXIT_X = COLUMN_SPACING * 2 + 480
-const DECISION_COLUMN = COLUMN_SPACING * 2 + 710
+/** Layout du parcours intégré : grille → réseau → verdicts → décision. */
+const LAYOUT = {
+  columnSpacing: 480,
+  nodeSpacing: 130,
+  startY: 80,
+  gridColumn: -290,
+  gridWidth: 300,
+  gridLabelSpace: 32,
+  gridFlowOffset: 78,
+  /** Décalage vers la gauche de la grille de départ et de sa flèche. */
+  gridShiftX: 30,
+  inputFlowAnchorX: -68,
+  /** Décalages depuis la colonne de sortie (×2 × columnSpacing). */
+  verdictOffset: 200,
+  /** Décalage horizontal des labels « C'est un x » / « Ce n'est pas un x ». */
+  verdictShiftX: 70,
+  networkExitOffset: 300,
+  decisionOffset: 650,
+  neuronWidth: 172,
+  neuronHeight: 112,
+  neuronFontSize: 20,
+  neuronTextMaxWidth: 108,
+  verdictFontSize: 19,
+  verdictTextMaxWidth: 220,
+  decisionWidth: 320,
+  decisionHeight: 340,
+  decisionFontSize: 22,
+  decisionTextMaxWidth: 290,
+  gridFontSize: 24,
+  flowToDecisionGap: 28,
+  /** Décalage horizontal global du réseau (grille et décision inchangées). */
+  networkOffsetX: 40,
+} as const
+
+const PORTRAIT_BREAKPOINT_PX = 1024
+const COMPACT_BREAKPOINT_PX = 768
+const NARROW_BREAKPOINT_PX = 500
+const INPUT_ROW_COUNT = 6
+/** Portrait : espacements dédiés (nodeSpacing ≥ hauteur neurone 112 px). */
+const PORTRAIT_LAYOUT = {
+  nodeSpacing: 128,
+  gridToNetworkGap: 120,
+  gridTop: 48,
+  networkToDecisionGap: 80,
+  /** Centre horizontal du réseau (colonnes étalées, neurones inchangés). */
+  centerX: 500,
+  columnSpacing: 460,
+  compact: {
+    gridTop: 12,
+    gridToNetworkGap: 72,
+    networkToDecisionGap: 40,
+    nodeSpacing: 122,
+  },
+  narrow: {
+    gridTop: 4,
+    gridToNetworkGap: 52,
+    networkToDecisionGap: 24,
+    nodeSpacing: 118,
+  },
+} as const
+
+type ViewportTier = 'default' | 'compact' | 'narrow'
+
+const FIT_PADDING: Record<ViewportTier | 'landscape' | 'portrait', number> = {
+  landscape: 48,
+  portrait: 18,
+  default: 18,
+  compact: 6,
+  narrow: 2,
+}
+
+function resolveFitPadding(
+  usePortraitFlow: boolean,
+  viewportTier: ViewportTier
+): number {
+  if (viewportTier === 'narrow') return FIT_PADDING.narrow
+  if (viewportTier === 'compact') return FIT_PADDING.compact
+  if (usePortraitFlow) return FIT_PADDING.portrait
+  return FIT_PADDING.landscape
+}
+
+type LayoutGeometry = {
+  isPortrait: boolean
+  nodeSpacing: number
+  startY: number
+  inputColumnX: number
+  hiddenColumnX: number
+  outputColumnX: number
+  outputStartY: number
+  gridPosition: { x: number; y: number }
+  flowAfterGrid: { x: number; y: number }
+  flowBeforeInput: { x: number; y: number }
+  networkExit: { x: number; y: number }
+  decision: { x: number; y: number }
+  verdictPosition: (index: number) => { x: number; y: number }
+}
+
+function buildLayoutGeometry(
+  isPortrait: boolean,
+  viewportTier: ViewportTier
+): LayoutGeometry {
+  const portraitNarrow = isPortrait && viewportTier === 'narrow'
+  const portraitCompact = isPortrait && viewportTier === 'compact'
+  const portraitSpacing = portraitNarrow
+    ? PORTRAIT_LAYOUT.narrow
+    : portraitCompact
+      ? PORTRAIT_LAYOUT.compact
+      : null
+  const nodeSpacing = isPortrait
+    ? (portraitSpacing?.nodeSpacing ?? PORTRAIT_LAYOUT.nodeSpacing)
+    : LAYOUT.nodeSpacing
+
+  if (!isPortrait) {
+    const columnSpacing = LAYOUT.columnSpacing
+    const networkOffsetX = LAYOUT.networkOffsetX
+    const gridColumn = LAYOUT.gridColumn - LAYOUT.gridShiftX
+    const inputColumnX = networkOffsetX
+    const hiddenColumnX = columnSpacing + networkOffsetX
+    const outputColumnX = columnSpacing * 2 + networkOffsetX
+    const inputFlowAnchorX =
+      LAYOUT.inputFlowAnchorX - LAYOUT.gridShiftX + networkOffsetX
+    const verdictColumnX =
+      outputColumnX + LAYOUT.verdictOffset + LAYOUT.verdictShiftX
+    const startY = LAYOUT.startY
+    const outputStartY = startY + ((INPUT_ROW_COUNT - 4) / 2) * nodeSpacing
+    const integratedCenterY = startY + 2.5 * nodeSpacing
+
+    return {
+      isPortrait: false,
+      nodeSpacing,
+      startY,
+      inputColumnX,
+      hiddenColumnX,
+      outputColumnX,
+      outputStartY,
+      gridPosition: { x: gridColumn, y: integratedCenterY },
+      flowAfterGrid: {
+        x: gridColumn + LAYOUT.gridFlowOffset,
+        y: integratedCenterY,
+      },
+      flowBeforeInput: { x: inputFlowAnchorX, y: integratedCenterY },
+      networkExit: {
+        x: outputColumnX + LAYOUT.networkExitOffset,
+        y: outputStartY + 1.5 * nodeSpacing,
+      },
+      decision: {
+        x: columnSpacing * 2 + LAYOUT.decisionOffset,
+        y: outputStartY + 1.5 * nodeSpacing,
+      },
+      verdictPosition: (index) => ({
+        x: verdictColumnX,
+        y: outputStartY + index * nodeSpacing,
+      }),
+    }
+  }
+
+  const centerX = PORTRAIT_LAYOUT.centerX
+  const columnSpacing = PORTRAIT_LAYOUT.columnSpacing
+  const gridTop = portraitSpacing?.gridTop ?? PORTRAIT_LAYOUT.gridTop
+  const gridToNetworkGap =
+    portraitSpacing?.gridToNetworkGap ?? PORTRAIT_LAYOUT.gridToNetworkGap
+  const networkToDecisionGap =
+    portraitSpacing?.networkToDecisionGap ?? PORTRAIT_LAYOUT.networkToDecisionGap
+  const gridCenterY = gridTop + GRID_NODE_HEIGHT / 2
+  const networkStartY = gridTop + GRID_NODE_HEIGHT + gridToNetworkGap
+  const inputColumnX = centerX - columnSpacing
+  const hiddenColumnX = centerX
+  const outputColumnX = centerX + columnSpacing
+  const outputStartY = networkStartY + nodeSpacing
+  const networkBottomY =
+    networkStartY + (INPUT_ROW_COUNT - 1) * nodeSpacing + LAYOUT.neuronHeight / 2
+  const networkExitY = networkBottomY + 40
+  const decisionY =
+    networkExitY + networkToDecisionGap + LAYOUT.decisionHeight / 2
+  const flowNetworkEntryY = networkStartY - 24
+
+  return {
+    isPortrait: true,
+    nodeSpacing,
+    startY: networkStartY,
+    inputColumnX,
+    hiddenColumnX,
+    outputColumnX,
+    outputStartY,
+    gridPosition: { x: centerX, y: gridCenterY },
+    flowAfterGrid: { x: centerX, y: flowNetworkEntryY },
+    flowBeforeInput: { x: centerX, y: flowNetworkEntryY },
+    networkExit: { x: centerX, y: networkExitY },
+    decision: { x: centerX, y: decisionY },
+    verdictPosition: (index) => ({
+      x: outputColumnX,
+      y: outputStartY + index * nodeSpacing + 58,
+    }),
+  }
+}
+
+function usePortraitLayout(): boolean {
+  const [isPortrait, setIsPortrait] = useState(
+    () =>
+      typeof window !== 'undefined' &&
+      window.matchMedia(`(max-width: ${PORTRAIT_BREAKPOINT_PX - 1}px)`).matches
+  )
+
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${PORTRAIT_BREAKPOINT_PX - 1}px)`)
+    const sync = () => setIsPortrait(mq.matches)
+    sync()
+    mq.addEventListener('change', sync)
+    return () => mq.removeEventListener('change', sync)
+  }, [])
+
+  return isPortrait
+}
+
+function useViewportTier(): ViewportTier {
+  const [tier, setTier] = useState<ViewportTier>(() => {
+    if (typeof window === 'undefined') return 'default'
+    if (window.matchMedia(`(max-width: ${NARROW_BREAKPOINT_PX - 1}px)`).matches) {
+      return 'narrow'
+    }
+    if (window.matchMedia(`(max-width: ${COMPACT_BREAKPOINT_PX - 1}px)`).matches) {
+      return 'compact'
+    }
+    return 'default'
+  })
+
+  useEffect(() => {
+    const narrowMq = window.matchMedia(
+      `(max-width: ${NARROW_BREAKPOINT_PX - 1}px)`
+    )
+    const compactMq = window.matchMedia(
+      `(max-width: ${COMPACT_BREAKPOINT_PX - 1}px)`
+    )
+    const sync = () => {
+      if (narrowMq.matches) setTier('narrow')
+      else if (compactMq.matches) setTier('compact')
+      else setTier('default')
+    }
+    sync()
+    narrowMq.addEventListener('change', sync)
+    compactMq.addEventListener('change', sync)
+    return () => {
+      narrowMq.removeEventListener('change', sync)
+      compactMq.removeEventListener('change', sync)
+    }
+  }, [])
+
+  return tier
+}
+
+const FLOW_NETWORK_TO_DECISION_GAP = LAYOUT.flowToDecisionGap
 const GRID_NODE_ID = 'START_GRID'
 const DECISION_NODE_ID = 'FINAL_DECISION'
 const FLOW_ANCHOR_AFTER_GRID = 'FLOW_ANCHOR_AFTER_GRID'
@@ -29,8 +271,8 @@ const FLOW_ANCHOR_BEFORE_INPUT = 'FLOW_ANCHOR_BEFORE_INPUT'
 const FLOW_ANCHOR_NETWORK_EXIT = 'FLOW_ANCHOR_NETWORK_EXIT'
 
 const GRID_CELL_PX = 18
-const GRID_NODE_WIDTH = 340
-const GRID_LABEL_SPACE = 24
+const GRID_NODE_WIDTH = LAYOUT.gridWidth
+const GRID_LABEL_SPACE = LAYOUT.gridLabelSpace
 
 function computeGridPreviewLayout(cellPx: number) {
   const sepMarginPx = Math.max(1, Math.round(cellPx / 24))
@@ -145,8 +387,7 @@ function patternToGridDataUrl(pattern: number[][]): string {
 
 function buildDecisionNodeData(
   allOutputsValidated: boolean,
-  decision: NetworkDecision,
-  selectedDigit: number | null | undefined
+  decision: NetworkDecision
 ): { label: string; outcome: string } {
   if (!allOutputsValidated) {
     return {
@@ -156,7 +397,7 @@ function buildDecisionNodeData(
   }
   if (decision.status === 'none') {
     return {
-      label: 'Décision finale\n\nAucun chiffre\nreconnu',
+      label: 'Décision finale\n\nNon reconnu',
       outcome: 'none',
     }
   }
@@ -166,15 +407,9 @@ function buildDecisionNodeData(
       outcome: 'ambiguous',
     }
   }
-  if (decision.digit === selectedDigit) {
-    return {
-      label: `Décision finale\n\n${decision.digit}\n\n✓ Reconnaissance\nréussie !`,
-      outcome: 'success',
-    }
-  }
   return {
-    label: `Décision finale\n\n${decision.digit}\n\n✗ Erreur :\n${selectedDigit} → ${decision.digit}`,
-    outcome: 'error',
+    label: `Décision finale\n\n${decision.digit}\n\n✓ C'est un ${decision.digit}`,
+    outcome: 'success',
   }
 }
 
@@ -183,16 +418,16 @@ const CYTOSCAPE_STYLE = [
     selector: 'node',
     style: {
       label: 'data(label)',
-      width: 180,
-      height: 120,
+      width: LAYOUT.neuronWidth,
+      height: LAYOUT.neuronHeight,
       shape: 'round-rectangle',
       'border-width': 2,
       'text-valign': 'center',
       'text-halign': 'center',
       color: '#1A182D',
-      'font-size': '22px',
+      'font-size': `${LAYOUT.neuronFontSize}px`,
       'text-wrap': 'wrap',
-      'text-max-width': '110px',
+      'text-max-width': `${LAYOUT.neuronTextMaxWidth}px`,
       'background-opacity': 0.9,
     },
   },
@@ -205,9 +440,9 @@ const CYTOSCAPE_STYLE = [
       'border-width': 0,
       'text-halign': 'left',
       'text-valign': 'center',
-      'font-size': '22px',
+      'font-size': `${LAYOUT.verdictFontSize}px`,
       'text-wrap': 'wrap',
-      'text-max-width': '260px',
+      'text-max-width': `${LAYOUT.verdictTextMaxWidth}px`,
     },
   },
   {
@@ -229,6 +464,15 @@ const CYTOSCAPE_STYLE = [
     style: {
       color: '#DC143C',
       'font-weight': 'normal',
+    },
+  },
+  {
+    selector: 'node[type = "verdict"][layout = "portrait"]',
+    style: {
+      'text-halign': 'center',
+      'text-valign': 'top',
+      'font-size': `${Math.max(14, LAYOUT.verdictFontSize - 2)}px`,
+      'text-max-width': `${Math.round(LAYOUT.neuronWidth * 1.1)}px`,
     },
   },
   {
@@ -324,8 +568,10 @@ const CYTOSCAPE_STYLE = [
       'background-position-x': '50%',
       'background-position-y': '58%',
       label: 'data(label)',
-      'font-size': '17px',
+      'font-size': `${LAYOUT.gridFontSize}px`,
       'font-weight': 'bold',
+      'text-wrap': 'none',
+      'text-max-width': `${LAYOUT.gridWidth}px`,
       'text-valign': 'top',
       'text-halign': 'center',
       'text-margin-y': 2,
@@ -335,17 +581,17 @@ const CYTOSCAPE_STYLE = [
   {
     selector: 'node[type = "decision"]',
     style: {
-      width: 260,
-      height: 280,
+      width: LAYOUT.decisionWidth,
+      height: LAYOUT.decisionHeight,
       shape: 'round-rectangle',
       'background-color': '#fff',
       'border-width': 3,
       'border-color': '#24A1EB',
       label: 'data(label)',
-      'font-size': '18px',
+      'font-size': `${LAYOUT.decisionFontSize}px`,
       'font-weight': 'bold',
       'text-wrap': 'wrap',
-      'text-max-width': '220px',
+      'text-max-width': `${LAYOUT.decisionTextMaxWidth}px`,
       color: '#1A182D',
       'text-valign': 'center',
       'text-halign': 'center',
@@ -378,7 +624,7 @@ const CYTOSCAPE_STYLE = [
       'border-color': '#EBEBEC',
       color: '#6B7280',
       'font-weight': 'normal',
-      'font-size': '15px',
+      'font-size': `${Math.max(14, LAYOUT.decisionFontSize - 2)}px`,
     },
   },
   {
@@ -424,7 +670,37 @@ const CYTOSCAPE_STYLE = [
       'z-index': 10,
     },
   },
+  {
+    selector: 'edge#FLOW-NETWORK-TO-DECISION',
+    style: {
+      'target-distance-from-node': FLOW_NETWORK_TO_DECISION_GAP,
+    },
+  },
 ]
+
+/** Recalcule labels et styles après mise à jour dynamique (cache Cytoscape). */
+function reflowCytoscapeGraph(
+  cy: cytoscape.Core,
+  options: { fit?: boolean; fitPadding?: number } = {}
+) {
+  cy.nodes('[?label]').forEach((node) => {
+    const label = node.data('label')
+    if (typeof label === 'string' && label.length > 0) {
+      node.removeData('label')
+      node.data('label', label)
+    }
+    const outcome = node.data('outcome')
+    if (outcome != null && outcome !== '') {
+      node.removeData('outcome')
+      node.data('outcome', outcome)
+    }
+  })
+  cy.style().update()
+  cy.resize()
+  if (options.fit) {
+    cy.fit(undefined, options.fitPadding ?? FIT_PADDING.landscape)
+  }
+}
 
 const NetworkVisualization = ({
   inputNeurons,
@@ -434,11 +710,17 @@ const NetworkVisualization = ({
   onAutoCalculateHidden,
   onAutoCalculateOutput,
   pattern = null,
-  selectedDigit = null,
 }: NetworkVisualizationProps) => {
   const cyRef = useRef<cytoscape.Core | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const outputNeuronsClickableRef = useRef(false)
+  const layoutModeRef = useRef(false)
+  const viewportTierRef = useRef<ViewportTier>('default')
+  const isPortraitLayout = usePortraitLayout()
+  const viewportTier = useViewportTier()
+  const showIntegratedFlow = pattern != null
+  const usePortraitFlow = isPortraitLayout && showIntegratedFlow
+  const fitPadding = resolveFitPadding(usePortraitFlow, viewportTier)
 
   const allHiddenValidated =
     hiddenNeurons.length >= NETWORK_STRUCTURE.hidden.length &&
@@ -464,6 +746,9 @@ const NetworkVisualization = ({
   useEffect(() => {
     if (!containerRef.current || inputNeurons.length === 0) return
 
+    const geo = buildLayoutGeometry(usePortraitFlow, viewportTier)
+    const verdictLayout = geo.isPortrait ? 'portrait' : 'landscape'
+    const networkNodeLayout = geo.isPortrait ? { layout: 'portrait' as const } : {}
     outputNeuronsClickableRef.current = allHiddenValidated
 
     const inputValuesMap = new Map(inputNeurons.map((n) => [n.id, n.value]))
@@ -481,8 +766,12 @@ const NetworkVisualization = ({
             value,
             layer: 'input',
             type: 'col',
+            ...networkNodeLayout,
           },
-          position: { x: 0, y: START_Y + index * NODE_SPACING },
+          position: {
+            x: geo.inputColumnX,
+            y: geo.startY + index * geo.nodeSpacing,
+          },
           locked: true,
         }
       })
@@ -498,10 +787,11 @@ const NetworkVisualization = ({
             value,
             layer: 'input',
             type: 'lig',
+            ...networkNodeLayout,
           },
           position: {
-            x: 0,
-            y: START_Y + (3 + index) * NODE_SPACING,
+            x: geo.inputColumnX,
+            y: geo.startY + (3 + index) * geo.nodeSpacing,
           },
           locked: true,
         }
@@ -530,18 +820,17 @@ const NetworkVisualization = ({
           validated: isValidated,
           warning: needsWarn ? 'true' : 'false',
           value: outputValue,
+          ...networkNodeLayout,
         },
         position: {
-          x: COLUMN_SPACING,
-          y: START_Y + index * NODE_SPACING,
+          x: geo.hiddenColumnX,
+          y: geo.startY + index * geo.nodeSpacing,
         },
         locked: true,
       }
     })
 
-    const outputStartY = START_Y + ((6 - 4) / 2) * NODE_SPACING
-    const integratedCenterY = START_Y + (2.5 * NODE_SPACING)
-    const showIntegrated = pattern != null
+    const showIntegrated = showIntegratedFlow
 
     const gridNode = showIntegrated
       ? [
@@ -553,7 +842,7 @@ const NetworkVisualization = ({
               layer: 'grid',
               image: patternToGridDataUrl(pattern),
             },
-            position: { x: GRID_COLUMN, y: integratedCenterY },
+            position: geo.gridPosition,
             locked: true,
           },
         ]
@@ -561,42 +850,59 @@ const NetworkVisualization = ({
 
     const decisionData = buildDecisionNodeData(
       allOutputsValidated,
-      networkDecision,
-      selectedDigit
+      networkDecision
     )
     const flowAnchorNodes = showIntegrated
-      ? [
-          {
-            data: {
-              id: FLOW_ANCHOR_AFTER_GRID,
-              type: 'flow-anchor',
-              layer: 'flow',
+      ? geo.isPortrait
+        ? [
+            {
+              data: {
+                id: FLOW_ANCHOR_BEFORE_INPUT,
+                type: 'flow-anchor',
+                layer: 'flow',
+              },
+              position: geo.flowBeforeInput,
+              locked: true,
             },
-            position: { x: GRID_COLUMN + 95, y: integratedCenterY },
-            locked: true,
-          },
-          {
-            data: {
-              id: FLOW_ANCHOR_BEFORE_INPUT,
-              type: 'flow-anchor',
-              layer: 'flow',
+            {
+              data: {
+                id: FLOW_ANCHOR_NETWORK_EXIT,
+                type: 'flow-anchor',
+                layer: 'flow',
+              },
+              position: geo.networkExit,
+              locked: true,
             },
-            position: { x: INPUT_FLOW_ANCHOR_X, y: integratedCenterY },
-            locked: true,
-          },
-          {
-            data: {
-              id: FLOW_ANCHOR_NETWORK_EXIT,
-              type: 'flow-anchor',
-              layer: 'flow',
+          ]
+        : [
+            {
+              data: {
+                id: FLOW_ANCHOR_AFTER_GRID,
+                type: 'flow-anchor',
+                layer: 'flow',
+              },
+              position: geo.flowAfterGrid,
+              locked: true,
             },
-            position: {
-              x: NETWORK_EXIT_X,
-              y: outputStartY + 1.5 * NODE_SPACING,
+            {
+              data: {
+                id: FLOW_ANCHOR_BEFORE_INPUT,
+                type: 'flow-anchor',
+                layer: 'flow',
+              },
+              position: geo.flowBeforeInput,
+              locked: true,
             },
-            locked: true,
-          },
-        ]
+            {
+              data: {
+                id: FLOW_ANCHOR_NETWORK_EXIT,
+                type: 'flow-anchor',
+                layer: 'flow',
+              },
+              position: geo.networkExit,
+              locked: true,
+            },
+          ]
       : []
     const decisionNode = showIntegrated
       ? [
@@ -608,10 +914,7 @@ const NetworkVisualization = ({
               layer: 'decision',
               outcome: decisionData.outcome,
             },
-            position: {
-              x: DECISION_COLUMN,
-              y: outputStartY + 1.5 * NODE_SPACING,
-            },
+            position: geo.decision,
             locked: true,
           },
         ]
@@ -642,10 +945,11 @@ const NetworkVisualization = ({
           warning: needsWarn ? 'true' : 'false',
           value: outputValue,
           locked: !allHiddenValidated,
+          ...networkNodeLayout,
         },
         position: {
-          x: COLUMN_SPACING * 2,
-          y: outputStartY + index * NODE_SPACING,
+          x: geo.outputColumnX,
+          y: geo.outputStartY + index * geo.nodeSpacing,
         },
         locked: true,
       }
@@ -685,11 +989,9 @@ const NetworkVisualization = ({
           outcome,
           digit,
           value,
+          layout: verdictLayout,
         },
-        position: {
-          x: VERDICT_COLUMN,
-          y: outputStartY + index * NODE_SPACING,
-        },
+        position: geo.verdictPosition(index),
         locked: true,
       }
     })
@@ -729,32 +1031,51 @@ const NetworkVisualization = ({
     }
     const edges = [...inputToHiddenEdges, ...hiddenToOutputEdges]
     const flowEdges = showIntegrated
-      ? [
-          {
-            data: {
-              id: 'FLOW-GRID-TO-MID',
-              source: GRID_NODE_ID,
-              target: FLOW_ANCHOR_AFTER_GRID,
-              flow: 'true',
+      ? geo.isPortrait
+        ? [
+            {
+              data: {
+                id: 'FLOW-GRID-TO-NETWORK',
+                source: GRID_NODE_ID,
+                target: FLOW_ANCHOR_BEFORE_INPUT,
+                flow: 'true',
+              },
             },
-          },
-          {
-            data: {
-              id: 'FLOW-MID-TO-INPUT',
-              source: FLOW_ANCHOR_AFTER_GRID,
-              target: FLOW_ANCHOR_BEFORE_INPUT,
-              flow: 'true',
+            {
+              data: {
+                id: 'FLOW-NETWORK-TO-DECISION',
+                source: FLOW_ANCHOR_NETWORK_EXIT,
+                target: DECISION_NODE_ID,
+                flow: 'true',
+              },
             },
-          },
-          {
-            data: {
-              id: 'FLOW-NETWORK-TO-DECISION',
-              source: FLOW_ANCHOR_NETWORK_EXIT,
-              target: DECISION_NODE_ID,
-              flow: 'true',
+          ]
+        : [
+            {
+              data: {
+                id: 'FLOW-GRID-TO-MID',
+                source: GRID_NODE_ID,
+                target: FLOW_ANCHOR_AFTER_GRID,
+                flow: 'true',
+              },
             },
-          },
-        ]
+            {
+              data: {
+                id: 'FLOW-MID-TO-INPUT',
+                source: FLOW_ANCHOR_AFTER_GRID,
+                target: FLOW_ANCHOR_BEFORE_INPUT,
+                flow: 'true',
+              },
+            },
+            {
+              data: {
+                id: 'FLOW-NETWORK-TO-DECISION',
+                source: FLOW_ANCHOR_NETWORK_EXIT,
+                target: DECISION_NODE_ID,
+                flow: 'true',
+              },
+            },
+          ]
       : []
     const nodes = [
       ...gridNode,
@@ -768,6 +1089,26 @@ const NetworkVisualization = ({
     const allEdges = [...edges, ...flowEdges]
 
     let cy = cyRef.current
+    const hasPortraitFlowEdges =
+      (cy?.getElementById('FLOW-GRID-TO-NETWORK').length ?? 0) > 0
+    if (cy && layoutModeRef.current !== geo.isPortrait) {
+      cy.destroy()
+      cyRef.current = null
+      cy = null
+    }
+    if (cy && viewportTierRef.current !== viewportTier) {
+      cy.destroy()
+      cyRef.current = null
+      cy = null
+    }
+    if (cy && showIntegrated && hasPortraitFlowEdges !== geo.isPortrait) {
+      cy.destroy()
+      cyRef.current = null
+      cy = null
+    }
+    layoutModeRef.current = geo.isPortrait
+    viewportTierRef.current = viewportTier
+
     if (
       cy &&
       showIntegrated &&
@@ -806,7 +1147,7 @@ const NetworkVisualization = ({
         }
       })
 
-      cyRef.current.fit(undefined, 48)
+      reflowCytoscapeGraph(cyRef.current, { fit: true, fitPadding })
     } else {
       const cy = cyRef.current
       for (const id of NETWORK_STRUCTURE.hidden) {
@@ -882,23 +1223,13 @@ const NetworkVisualization = ({
       }
       if (showIntegrated) {
         const integratedPositions: Record<string, { x: number; y: number }> = {
-          [GRID_NODE_ID]: { x: GRID_COLUMN, y: integratedCenterY },
-          [FLOW_ANCHOR_AFTER_GRID]: {
-            x: GRID_COLUMN + 95,
-            y: integratedCenterY,
-          },
-          [FLOW_ANCHOR_BEFORE_INPUT]: {
-            x: INPUT_FLOW_ANCHOR_X,
-            y: integratedCenterY,
-          },
-          [FLOW_ANCHOR_NETWORK_EXIT]: {
-            x: NETWORK_EXIT_X,
-            y: outputStartY + 1.5 * NODE_SPACING,
-          },
-          [DECISION_NODE_ID]: {
-            x: DECISION_COLUMN,
-            y: outputStartY + 1.5 * NODE_SPACING,
-          },
+          [GRID_NODE_ID]: geo.gridPosition,
+          [FLOW_ANCHOR_BEFORE_INPUT]: geo.flowBeforeInput,
+          [FLOW_ANCHOR_NETWORK_EXIT]: geo.networkExit,
+          [DECISION_NODE_ID]: geo.decision,
+        }
+        if (!geo.isPortrait) {
+          integratedPositions[FLOW_ANCHOR_AFTER_GRID] = geo.flowAfterGrid
         }
         for (const [nodeId, position] of Object.entries(integratedPositions)) {
           const layoutNode = cy.getElementById(nodeId)
@@ -907,10 +1238,8 @@ const NetworkVisualization = ({
         for (const [index, id] of NETWORK_STRUCTURE.output.entries()) {
           const verdictNode = cy.getElementById(`${id}_VERDICT`)
           if (verdictNode.length > 0) {
-            verdictNode.position({
-              x: VERDICT_COLUMN,
-              y: outputStartY + index * NODE_SPACING,
-            })
+            verdictNode.position(geo.verdictPosition(index))
+            verdictNode.data('layout', verdictLayout)
           }
         }
         const gridNodeEl = cy.getElementById(GRID_NODE_ID)
@@ -919,8 +1248,7 @@ const NetworkVisualization = ({
         }
         const nextDecision = buildDecisionNodeData(
           allOutputsValidated,
-          networkDecision,
-          selectedDigit
+          networkDecision
         )
         const decisionNodeEl = cy.getElementById(DECISION_NODE_ID)
         if (decisionNodeEl.length > 0) {
@@ -956,8 +1284,9 @@ const NetworkVisualization = ({
           }
         }
       }
-      cy.style().update()
-      cy.fit(undefined, 48)
+      requestAnimationFrame(() => {
+        reflowCytoscapeGraph(cy, { fit: false })
+      })
     }
   }, [
     inputNeurons,
@@ -965,7 +1294,9 @@ const NetworkVisualization = ({
     outputNeurons,
     onNeuronClick,
     pattern,
-    selectedDigit,
+    usePortraitFlow,
+    viewportTier,
+    fitPadding,
   ])
 
   useEffect(() => {
@@ -974,8 +1305,10 @@ const NetworkVisualization = ({
 
     const refitGraph = () => {
       if (!cyRef.current) return
-      cyRef.current.resize()
-      cyRef.current.fit(undefined, 48)
+      reflowCytoscapeGraph(cyRef.current, {
+        fit: true,
+        fitPadding: resolveFitPadding(usePortraitFlow, viewportTier),
+      })
     }
 
     const observer = new ResizeObserver(refitGraph)
@@ -985,7 +1318,7 @@ const NetworkVisualization = ({
       observer.disconnect()
       window.removeEventListener('resize', refitGraph)
     }
-  }, [])
+  }, [usePortraitFlow, viewportTier])
 
   return (
     <section className="bg-white border-2 border-grey rounded-2xl p-4 sm:p-6 min-[1800px]:p-8 shadow-sm animate-fade-in-up">
@@ -1002,7 +1335,20 @@ const NetworkVisualization = ({
         </p>
         <div
           ref={containerRef}
-          className="w-full h-[420px] lg:h-[480px] xl:h-[540px] min-[1800px]:h-[700px] border-2 border-grey rounded-xl bg-gray-50"
+          className={[
+            'w-full border-2 border-grey rounded-xl bg-gray-50',
+            usePortraitFlow
+              ? viewportTier === 'narrow'
+                ? 'h-[680px]'
+                : viewportTier === 'compact'
+                  ? 'h-[800px]'
+                  : 'h-[920px]'
+              : viewportTier === 'narrow'
+                ? 'h-[280px]'
+                : viewportTier === 'compact'
+                  ? 'h-[340px]'
+                  : 'h-[420px] lg:h-[480px] xl:h-[540px] min-[1800px]:h-[700px]',
+          ].join(' ')}
         />
         {!allHiddenValidated && (
           <div className="space-y-3">

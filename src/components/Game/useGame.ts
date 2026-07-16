@@ -264,7 +264,10 @@ export function useGame() {
   }, [])
 
   const loadDigitExample = useCallback(
-    (digit: RecognizedDigit, type: 'perfect' | 'good') => {
+    (
+      digit: RecognizedDigit,
+      type: 'perfect' | 'good' | 'unrecognized'
+    ) => {
       const examples = DIGIT_EXAMPLES[digit]
       const grid = examples?.[type]
       if (!grid) return

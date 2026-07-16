@@ -1,6 +1,6 @@
 /**
  * Sommes « de référence » pour les pastilles sur la règlette mode seuil :
- * chaque grille vient de DIGIT_EXAMPLES (perfect = DIGIT_PATTERNS, good = variante).
+ * chaque grille vient de DIGIT_EXAMPLES (perfect, good, unrecognized).
  * Les entrées COL/LIG sont dérivées comme à l’étape comptage.
  * Pour les neurones de sortie, les sorties ReLU cachées utilisent les seuils
  * passés en paramètre (sinon NETWORK_STRUCTURE par défaut).
@@ -17,7 +17,7 @@ import {
 } from './networkDecision'
 import type { SessionDigitEntry } from './sessionDigits'
 
-export type DigitVariantTag = 'p' | 'g' | 'current' | 's'
+export type DigitVariantTag = 'p' | 'g' | 'u' | 'current' | 's'
 
 export type DigitReferenceMark = {
   digit: number
@@ -167,12 +167,24 @@ function outputPreReLuSum(
   return Object.values(inputs).reduce((a, b) => a + (Number(b) || 0), 0)
 }
 
+function exampleVariantsForDigit(
+  digit: number
+): Extract<DigitVariantTag, 'p' | 'g' | 'u'>[] {
+  const entry = DIGIT_EXAMPLES[digit as keyof typeof DIGIT_EXAMPLES]
+  if (!entry) return []
+  const variants: Extract<DigitVariantTag, 'p' | 'g' | 'u'>[] = ['p', 'g']
+  if (entry.unrecognized) variants.push('u')
+  return variants
+}
+
 function exampleGrid(
   digit: number,
-  variant: Extract<DigitVariantTag, 'p' | 'g'>
+  variant: Extract<DigitVariantTag, 'p' | 'g' | 'u'>
 ): number[][] {
   const entry = DIGIT_EXAMPLES[digit as keyof typeof DIGIT_EXAMPLES]
-  return variant === 'p' ? entry.perfect : entry.good
+  if (variant === 'p') return entry.perfect
+  if (variant === 'g') return entry.good
+  return entry.unrecognized!
 }
 
 function appendSessionMarks(
@@ -282,7 +294,9 @@ function buildRecognitionResult(
     isAmbiguous,
     ambiguousDigits,
     isRecognized:
-      decision.status === 'clear' && decision.digit === expectedDigit,
+      variant === 'current'
+        ? decision.status === 'clear'
+        : decision.status === 'clear' && decision.digit === expectedDigit,
     outputValues,
   }
 }
@@ -304,7 +318,7 @@ export function computeAllDigitRecognitions(
 
   for (const digit of RECOGNIZED_DIGITS) {
     if (!(digit in DIGIT_EXAMPLES)) continue
-    for (const variant of ['p', 'g'] as const) {
+    for (const variant of exampleVariantsForDigit(digit)) {
       const grid = exampleGrid(digit, variant)
       const { decision, outputValues } = simulateRecognitionForGrid(
         grid,
@@ -424,7 +438,7 @@ export function getReferenceMarksForHiddenNeuron(
   const marks: DigitReferenceMark[] = []
   for (const digit of RECOGNIZED_DIGITS) {
     if (!(digit in DIGIT_EXAMPLES)) continue
-    for (const variant of ['p', 'g'] as const) {
+    for (const variant of exampleVariantsForDigit(digit)) {
       const grid = exampleGrid(digit, variant)
       const inputValues = patternToInputValues(grid)
       const sum = hiddenPreReLuSum(hiddenId, inputValues)
@@ -469,7 +483,7 @@ export function getReferenceMarksForOutputNeuron(
   const marks: DigitReferenceMark[] = []
   for (const digit of RECOGNIZED_DIGITS) {
     if (!(digit in DIGIT_EXAMPLES)) continue
-    for (const variant of ['p', 'g'] as const) {
+    for (const variant of exampleVariantsForDigit(digit)) {
       const grid = exampleGrid(digit, variant)
       const inputValues = patternToInputValues(grid)
       const sum = outputPreReLuSum(outputId, inputValues, thresholds)

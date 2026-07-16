@@ -27,21 +27,46 @@ interface ThresholdDigitSidePanelProps {
 const VARIANT_LABELS: Record<DigitVariantTag, string> = {
   p: 'Parfait',
   g: 'Bien dessiné',
+  u: 'Non reconnu',
   current: 'Chiffre en cours',
   s: 'Session',
 }
 
-function recognitionStatusLabel(result: DigitRecognitionResult): string {
+/** Reconnu clairement comme le bon chiffre (p, g, u et session). */
+function isVariantExpectationMet(result: DigitRecognitionResult): boolean {
+  return result.isRecognized
+}
+
+function networkOutcomeLabel(result: DigitRecognitionResult): string {
   if (result.isAmbiguous) {
     return formatAmbiguityMessage(result.ambiguousDigits)
   }
-  if (result.isRecognized) return `Reconnu comme ${result.digit}`
-  if (result.recognizedDigit === null) return 'Non reconnu'
+  if (result.isRecognized) {
+    return `Reconnu comme ${result.digit}`
+  }
+  if (result.recognizedDigit === null) {
+    return 'Non reconnu'
+  }
   return `Confondu avec ${result.recognizedDigit}`
 }
 
+function recognitionStatusLabel(result: DigitRecognitionResult): string {
+  if (result.variant === 'current') {
+    if (result.isRecognized && result.recognizedDigit != null) {
+      return `C'est un ${result.recognizedDigit}`
+    }
+    return 'Non reconnu'
+  }
+  return networkOutcomeLabel(result)
+}
+
 function recognitionCardClasses(result: DigitRecognitionResult): string {
-  if (result.isRecognized) {
+  if (result.variant === 'current') {
+    if (result.isRecognized) return 'border-green/50 bg-green/10'
+    if (result.isAmbiguous) return 'border-yellow-hover/60 bg-yellow/15'
+    return 'border-grey bg-white'
+  }
+  if (isVariantExpectationMet(result)) {
     return 'border-green/50 bg-green/10'
   }
   if (result.isAmbiguous) {
@@ -54,14 +79,30 @@ function recognitionCardClasses(result: DigitRecognitionResult): string {
 }
 
 function recognitionTextClasses(result: DigitRecognitionResult): string {
-  if (result.isRecognized) return 'text-green'
+  if (result.variant === 'current') {
+    if (result.isRecognized) return 'text-green'
+    if (result.isAmbiguous) return 'text-darkBlue'
+    return 'text-astro'
+  }
+  if (isVariantExpectationMet(result)) {
+    return 'text-green'
+  }
   if (result.isAmbiguous) return 'text-darkBlue'
   if (result.recognizedDigit === null) return 'text-astro'
   return 'text-red'
 }
 
 function recognitionSymbol(result: DigitRecognitionResult): string {
-  if (result.isRecognized) return '✓'
+  if (result.variant === 'current') {
+    if (result.isRecognized && result.recognizedDigit != null) {
+      return `✓ ${result.recognizedDigit}`
+    }
+    if (result.isAmbiguous) return '↔'
+    return '—'
+  }
+  if (isVariantExpectationMet(result)) {
+    return '✓'
+  }
   if (result.isAmbiguous) return '↔'
   if (result.recognizedDigit === null) return '—'
   return `→ ${result.recognizedDigit}`
@@ -279,9 +320,11 @@ const ThresholdDigitSidePanel = ({
           <div className="space-y-4">
             {RECOGNIZED_DIGITS.map((digit) => {
               const digitResults = recognitions.filter(
-                (r) => r.digit === digit && (r.variant === 'p' || r.variant === 'g')
+                (r) =>
+                  r.digit === digit &&
+                  (r.variant === 'p' || r.variant === 'g' || r.variant === 'u')
               )
-              const digitOk = digitResults.every((r) => r.isRecognized)
+              const digitOk = digitResults.every(isVariantExpectationMet)
               return (
                 <div
                   key={digit}
@@ -304,7 +347,7 @@ const ThresholdDigitSidePanel = ({
                     >
                       {digitOk
                         ? 'Reconnu'
-                        : `${digitResults.filter((r) => r.isRecognized).length}/${digitResults.length}`}
+                        : `${digitResults.filter(isVariantExpectationMet).length}/${digitResults.length}`}
                     </span>
                   </div>
                   <ul className="space-y-1.5">

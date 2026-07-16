@@ -19,6 +19,7 @@ import {
   type NetworkDecision,
   type OutputActivation,
 } from '../networkDecision'
+import { TutorialCoachMark } from '../../Tutorial'
 
 type ParsedTerm = {
   id: string
@@ -366,6 +367,11 @@ const NetworkInteractionStep = ({
         defaultOpen={mode === 'seuil'}
       />
       <div className="md:ml-11 min-w-0">
+      <TutorialCoachMark
+        step={
+          mode === 'seuil' ? 'network-interaction-seuil' : 'network-interaction'
+        }
+      />
       <div className="mb-6 flex flex-wrap justify-center gap-3">
         <button
           type="button"
@@ -408,7 +414,6 @@ const NetworkInteractionStep = ({
               onAutoCalculateHidden={onAutoCalculateHidden}
               onAutoCalculateOutput={onAutoCalculateOutput}
               pattern={pattern}
-              selectedDigit={selectedDigit}
             />
           ) : (
             thresholdPanel

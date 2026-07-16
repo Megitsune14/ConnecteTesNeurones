@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { DIGIT_EXAMPLES } from './constants'
 import { useGame } from './useGame'
 import NeuronPanel from './NeuronPanel'
 import DigitSelectionStep from './steps/DigitSelectionStep'
 import GridDivisionStep from './steps/GridDivisionStep'
 import PixelCountingStep from './steps/PixelCountingStep'
 import NetworkInteractionStep from './steps/NetworkInteractionStep'
+import { TutorialCoachMark, TutorialSettingsFab } from '../Tutorial'
 
 const Game = () => {
   const navigate = useNavigate()
@@ -52,6 +54,7 @@ const Game = () => {
 
   return (
     <div className="relative w-full min-h-0 bg-gray-100 overflow-auto font-sans">
+      <TutorialSettingsFab />
       {/* Sidebar fixe à gauche : uniquement à l'étape sélection du chiffre */}
       {currentStep === 'digit-selection' && (
         <div className="max-md:px-4 max-md:pt-4 md:contents">
@@ -103,6 +106,18 @@ const Game = () => {
                     >
                       Bien dessiné
                     </button>
+                    {DIGIT_EXAMPLES[digit].unrecognized != null && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          loadDigitExample(digit, 'unrecognized')
+                          setOpenExampleDigit(null)
+                        }}
+                        className="text-xs px-2 py-1 rounded border border-grey bg-white text-darkBlue hover:bg-blue/10 transition-colors whitespace-nowrap"
+                      >
+                        Non reconnu
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -123,6 +138,9 @@ const Game = () => {
           <div className="w-[200px] h-0.5 mx-auto bg-gradient-accent rounded" />
         </div>
         <div className="space-y-8">
+          {currentStep !== 'network-interaction' && (
+            <TutorialCoachMark step={currentStep} />
+          )}
           {currentStep === 'digit-selection' && (
             <DigitSelectionStep
               onValidateGrid={validateDigitGrid}

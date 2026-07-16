@@ -175,7 +175,7 @@ const ThresholdRuler = ({
                     }
                     pattern={m.grid}
                   />
-                ) : m.variant === 'p' || m.variant === 'g' ? (
+                ) : m.variant === 'p' || m.variant === 'g' || m.variant === 'u' ? (
                   <span
                     key={`${neuronId}-${m.digit}-${m.variant}`}
                     className={[
@@ -184,7 +184,11 @@ const ThresholdRuler = ({
                         'border-grey bg-white text-darkBlue',
                     ].join(' ')}
                     title={`Chiffre ${m.digit}, motif ${
-                      m.variant === 'p' ? 'perfect' : 'good'
+                      m.variant === 'p'
+                        ? 'perfect'
+                        : m.variant === 'g'
+                          ? 'good'
+                          : 'unrecognized'
                     } (DIGIT_EXAMPLES) — somme ${m.sum}`}
                   >
                     {m.digit}

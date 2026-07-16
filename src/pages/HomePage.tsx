@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { Section } from '../components/ui'
+import { useTutorial } from '../context/TutorialContext'
 import logoMmi from '../assets/logo_mmi.png'
 
 const MMI_URL = 'https://mmi.universite-lyon.fr/'
@@ -7,6 +8,8 @@ const ATELIER_URL =
   'https://mmi.universite-lyon.fr/pour-les-scolaires/ressources-pedagogiques-et-de-mediation/connecte-tes-neurones-385696.kjsp'
 
 const HomePage = () => {
+  const { tutorialEnabled, setTutorialEnabled } = useTutorial()
+
   return (
     <div className="mx-auto w-full max-w-screen-xl px-4 py-10 sm:px-6 md:px-8">
       <Section className="mt-0">
@@ -16,29 +19,33 @@ const HomePage = () => {
         <div className="text-astro space-y-4 text-base font-medium leading-relaxed">
           <p>
             <strong className="text-darkBlue">Connecte tes neurones</strong> est
-            une activité interactive pour comprendre, pas à pas, comment un
-            réseau de neurones peut reconnaître un chiffre dessiné à la main.
+            un atelier de la MMI pour comprendre, pas à pas, comment un réseau
+            reconnaît un chiffre dessiné à la main (
+            <strong className="text-darkBlue">0, 3, 6 ou 9</strong>).
           </p>
           <p>
-            Vous tracez un chiffre sur une grille, vous observez comment
-            l’image est découpée en colonnes et en lignes, puis vous
-            alimentez un petit réseau en comptant les pixels et en calculant
-            les activations. À la fin, le réseau « décide » entre les chiffres{' '}
-            <strong className="text-darkBlue">0, 3, 6 et 9</strong>.
-          </p>
-          <p>
-            Aucune formule magique : vous reproduisez vous-même les sommes et
-            les seuils pour voir comment l’information circule d’une couche à
-            l’autre.
+            Vous dessinez sur une grille, comptez les pixels par bandelette,
+            calculez vous-même les sommes et les seuils, puis suivez la décision
+            du réseau, de la grille au verdict final. En mode seuil, vous
+            ajustez les seuils pour affiner la reconnaissance.
           </p>
         </div>
-        <div className="mt-8 flex justify-center">
+        <div className="mt-8 flex flex-col items-center gap-4">
           <Link
             to="/game"
             className="inline-flex min-h-11 items-center justify-center rounded-xl bg-blue px-8 py-3.5 text-lg font-semibold text-white shadow transition hover:bg-blue-hover focus:outline-none focus:ring-2 focus:ring-blue/40"
           >
             Jouer
           </Link>
+          <label className="flex cursor-pointer items-center gap-2.5 text-sm font-medium text-astro">
+            <input
+              type="checkbox"
+              checked={tutorialEnabled}
+              onChange={(event) => setTutorialEnabled(event.target.checked)}
+              className="h-4 w-4 accent-blue"
+            />
+            Activer le tutoriel
+          </label>
         </div>
       </Section>
 
@@ -68,8 +75,8 @@ const HomePage = () => {
                 className="font-semibold text-blue underline underline-offset-2 hover:text-blue-hover"
               >
                 MMI
-              </a>{' '}
-              — Maison des mathématiques et de l&apos;informatique.
+              </a>
+              , Maison des mathématiques et de l&apos;informatique.
             </p>
             <p className="mt-2">
               <a

@@ -60,12 +60,13 @@ const clonePattern = (pattern: number[][]): number[][] =>
 const EXAMPLE_DIGITS = [0, 3, 6, 9] as const
 type ExampleDigit = (typeof EXAMPLE_DIGITS)[number]
 
-/** perfect = motif « bien », good = motif « bof » (aperçu latéral / variante imparfaite). */
+/** perfect = motif idéal, good = bien dessiné, unrecognized = variante non reconnue par le réseau. */
 export const DIGIT_EXAMPLES: Record<
   ExampleDigit,
   {
     perfect: number[][]
     good: number[][]
+    unrecognized?: number[][]
   }
 > = {
   0: {
@@ -79,6 +80,17 @@ export const DIGIT_EXAMPLES: Record<
       [0, 1, 0, 0, 0, 1],
       [0, 1, 0, 0, 1, 1],
       [0, 1, 0, 0, 1, 0],
+      [0, 0, 1, 1, 0, 0],
+    ],
+    unrecognized: [
+      [0, 0, 1, 1, 0, 0],
+      [0, 1, 1, 1, 1, 0],
+      [0, 1, 0, 0, 1, 0],
+      [0, 1, 0, 0, 1, 0],
+      [0, 1, 0, 0, 1, 0],
+      [0, 1, 0, 0, 1, 0],
+      [0, 0, 0, 0, 1, 0],
+      [0, 0, 0, 1, 1, 0],
       [0, 0, 1, 1, 0, 0],
     ],
   },
@@ -95,6 +107,17 @@ export const DIGIT_EXAMPLES: Record<
       [0, 0, 0, 1, 1, 0],
       [0, 1, 1, 1, 0, 0],
     ],
+    unrecognized: [
+      [0, 1, 1, 1, 0, 0],
+      [0, 0, 0, 1, 1, 0],
+      [0, 0, 0, 1, 1, 0],
+      [0, 1, 1, 1, 1, 0],
+      [0, 0, 0, 1, 0, 0],
+      [0, 0, 0, 0, 1, 0],
+      [0, 0, 0, 0, 1, 0],
+      [0, 1, 0, 0, 1, 0],
+      [0, 1, 1, 1, 0, 0],
+    ],
   },
   6: {
     perfect: clonePattern(DIGIT_PATTERNS[6]),
@@ -109,6 +132,17 @@ export const DIGIT_EXAMPLES: Record<
       [0, 1, 0, 1, 1, 0],
       [0, 0, 1, 1, 0, 0],
     ],
+    unrecognized: [
+      [0, 0, 0, 0, 0, 0],
+      [0, 0, 0, 1, 1, 0],
+      [0, 0, 1, 1, 0, 0],
+      [0, 1, 1, 0, 0, 0],
+      [0, 1, 0, 0, 0, 0],
+      [0, 1, 1, 1, 1, 0],
+      [0, 0, 0, 0, 1, 0],
+      [0, 1, 0, 1, 1, 0],
+      [0, 0, 1, 1, 0, 0],
+    ],
   },
   9: {
     perfect: clonePattern(DIGIT_PATTERNS[9]),
@@ -120,6 +154,17 @@ export const DIGIT_EXAMPLES: Record<
       [0, 1, 1, 0, 1, 0],
       [0, 0, 0, 0, 1, 0],
       [0, 0, 0, 0, 1, 0],
+      [0, 0, 0, 0, 1, 0],
+      [0, 0, 1, 1, 1, 0],
+    ],
+    unrecognized: [
+      [1, 0, 1, 1, 0, 0],
+      [0, 1, 0, 0, 1, 0],
+      [0, 1, 0, 1, 1, 0],
+      [0, 1, 0, 1, 1, 0],
+      [0, 1, 1, 0, 1, 0],
+      [0, 0, 0, 0, 1, 0],
+      [0, 0, 0, 0, 1, 1],
       [0, 0, 0, 0, 1, 0],
       [0, 0, 1, 1, 1, 0],
     ],
