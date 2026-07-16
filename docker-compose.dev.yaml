@@ -1,4 +1,5 @@
 # Surcharge développement local : build + serveur Vite + ports.
+# Vite écoute sur 5173 dans le conteneur ; accès local : http://localhost:3001/
 # Usage : docker compose -f docker-compose.yaml -f docker-compose.dev.yaml up -d --build
 services:
   app:
@@ -7,11 +8,16 @@ services:
       context: .
       dockerfile: Dockerfile
       target: development
+    environment:
+      NODE_ENV: development
+      PORT: "5173"
     ports:
-      - "${PORT:-5173}:5173"
+      - "${DEV_HOST_PORT:-3001}:5173"
     volumes:
       - .:/app
       - /app/node_modules
+    healthcheck:
+      disable: true
     labels:
       - "traefik.enable=false"
     networks: !override
