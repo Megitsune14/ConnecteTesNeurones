@@ -40,6 +40,9 @@ const Game = () => {
     loadDigitExample,
     applySeuilThreshold,
     resetThresholdsToDefaults,
+    clearSavedThresholdsAndReset,
+    restoreSavedThresholds,
+    savedThresholdsPresent,
   } = useGame()
 
   const [openExampleDigit, setOpenExampleDigit] = useState<number | null>(null)
@@ -94,7 +97,7 @@ const Game = () => {
                       }}
                       className="text-xs px-2 py-1 rounded border border-grey bg-white text-darkBlue hover:bg-blue/10 transition-colors whitespace-nowrap"
                     >
-                      Parfait
+                      Bien reconnu
                     </button>
                     <button
                       type="button"
@@ -104,7 +107,7 @@ const Game = () => {
                       }}
                       className="text-xs px-2 py-1 rounded border border-grey bg-white text-darkBlue hover:bg-blue/10 transition-colors whitespace-nowrap"
                     >
-                      Bien dessiné
+                      Reconnu
                     </button>
                     {DIGIT_EXAMPLES[digit].unrecognized != null && (
                       <button
@@ -176,6 +179,9 @@ const Game = () => {
               onReset={resetToDigitSelection}
               onApplySeuilThreshold={applySeuilThreshold}
               onResetThresholds={resetThresholdsToDefaults}
+              onClearSavedThresholdsAndReset={clearSavedThresholdsAndReset}
+              onRestoreSavedThresholds={restoreSavedThresholds}
+              savedThresholdsPresent={savedThresholdsPresent}
             />
           )}
           {activeNeuronId != null && activeNeuron != null && (

@@ -12,7 +12,7 @@ export const TUTORIAL_MESSAGES: Record<TutorialStepKey, string> = {
   'pixel-counting':
     'Comptez les pixels noirs dans chaque bandelette et saisissez la valeur, ou utilisez le comptage automatique. Remplissez les six valeurs pour alimenter le réseau.',
   'network-interaction':
-    'Dans le réseau, cliquez sur chaque neurone caché (A à F) pour calculer sa somme et sa sortie, puis sur les neurones de sortie (0, 3, 6, 9). Suivez le parcours de la grille jusqu’à la décision finale.',
+    'Dans le réseau, cliquez sur chaque neurone caché (A à F) pour calculer sa somme et sa sortie, puis sur les neurones de sortie (0, 3, 6, 9). Suivez le parcours de la grille jusqu’à la décision finale. Une fois toutes les valeurs calculées, passez en mode seuil pour ajuster les seuils.',
   'network-interaction-seuil':
     'En mode seuil, ajustez les curseurs pour modifier les seuils des neurones. Calibrez la reconnaissance sur les exemples de référence, y compris les cas plus difficiles.',
 }

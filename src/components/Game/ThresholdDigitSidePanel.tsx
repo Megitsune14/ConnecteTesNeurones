@@ -5,12 +5,13 @@ import {
   computeAllDigitRecognitions,
   computeCurrentGridRecognition,
   DIGIT_MARK_BADGE_CLASSES,
+  formatSeuilRulerBadgeLabel,
   type DigitRecognitionResult,
   type DigitVariantTag,
 } from './referenceDigitSums'
 import type { SessionDigitEntry } from './sessionDigits'
 import {
-  formatAmbiguityMessage,
+  formatAmbiguityFromDecision,
 } from './networkDecision'
 
 interface ThresholdDigitSidePanelProps {
@@ -25,11 +26,18 @@ interface ThresholdDigitSidePanelProps {
 }
 
 const VARIANT_LABELS: Record<DigitVariantTag, string> = {
-  p: 'Parfait',
-  g: 'Bien dessiné',
+  p: 'Bien reconnu',
+  g: 'Reconnu',
   u: 'Non reconnu',
   current: 'Chiffre en cours',
   s: 'Session',
+}
+
+function formatReferenceBadge(result: DigitRecognitionResult): string {
+  if (result.variant === 'p' || result.variant === 'g') {
+    return formatSeuilRulerBadgeLabel(result.digit, result.variant)
+  }
+  return `${result.digit}${result.variant}`
 }
 
 /** Reconnu clairement comme le bon chiffre (p, g, u et session). */
@@ -38,8 +46,8 @@ function isVariantExpectationMet(result: DigitRecognitionResult): boolean {
 }
 
 function networkOutcomeLabel(result: DigitRecognitionResult): string {
-  if (result.isAmbiguous) {
-    return formatAmbiguityMessage(result.ambiguousDigits)
+  if (result.isAmbiguous && result.decision.status === 'ambiguous') {
+    return formatAmbiguityFromDecision(result.decision)
   }
   if (result.isRecognized) {
     return `Reconnu comme ${result.digit}`
@@ -145,8 +153,14 @@ const ThresholdDigitSidePanel = ({
     [thresholdValues, pattern, selectedDigit]
   )
 
-  const recognizedCount = recognitions.filter((r) => r.isRecognized).length
-  const allReferencesOk = recognizedCount === recognitions.length
+  const referenceRecognitions = useMemo(
+    () => recognitions.filter((r) => r.variant === 'p' || r.variant === 'g'),
+    [recognitions]
+  )
+  const recognizedCount = referenceRecognitions.filter((r) => r.isRecognized).length
+  const allReferencesOk =
+    recognizedCount === referenceRecognitions.length &&
+    referenceRecognitions.length > 0
   const canSaveCurrent = pattern != null && selectedDigit != null
 
   return (
@@ -181,7 +195,7 @@ const ThresholdDigitSidePanel = ({
                 Chiffres de référence
               </p>
               <p className="text-xs font-medium text-astro">
-                {recognizedCount}/{recognitions.length} reconnus
+                {recognizedCount}/{referenceRecognitions.length} reconnus
               </p>
             </div>
           </>
@@ -202,7 +216,7 @@ const ThresholdDigitSidePanel = ({
                     : 'bg-yellow/25 text-darkBlue'
               }`}
             >
-              {recognizedCount}/{recognitions.length}
+              {recognizedCount}/{referenceRecognitions.length}
             </span>
           </>
         )}
@@ -322,7 +336,7 @@ const ThresholdDigitSidePanel = ({
               const digitResults = recognitions.filter(
                 (r) =>
                   r.digit === digit &&
-                  (r.variant === 'p' || r.variant === 'g' || r.variant === 'u')
+                  (r.variant === 'p' || r.variant === 'g')
               )
               const digitOk = digitResults.every(isVariantExpectationMet)
               return (
@@ -367,8 +381,7 @@ const ThresholdDigitSidePanel = ({
                                 'border-grey bg-white text-darkBlue',
                             ].join(' ')}
                           >
-                            {result.digit}
-                            {result.variant}
+                            {formatReferenceBadge(result)}
                           </span>
                           <span
                             className={`font-semibold ${recognitionTextClasses(result)}`}

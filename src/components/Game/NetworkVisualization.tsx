@@ -3,6 +3,7 @@ import cytoscape from 'cytoscape'
 import type { NetworkVisualizationProps } from './types'
 import { NETWORK_STRUCTURE } from './constants'
 import {
+  formatAmbiguityPercentages,
   formatDigitsList,
   getOutputVerdictLabel,
   getOutputVerdictOutcome,
@@ -402,8 +403,11 @@ function buildDecisionNodeData(
     }
   }
   if (decision.status === 'ambiguous') {
+    const percentages =
+      formatAmbiguityPercentages(decision.activations) ||
+      formatDigitsList(decision.digits)
     return {
-      label: `Décision finale\n\nAmbiguïté\n\n${formatDigitsList(decision.digits)}`,
+      label: `Décision finale\n\nAmbiguïté\n\n${percentages}`,
       outcome: 'ambiguous',
     }
   }

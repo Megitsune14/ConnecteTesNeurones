@@ -1,6 +1,137 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import type { NeuronPanelProps } from './types'
 import { NEURONE_FORMULAS } from './constants'
+
+/** Marge minimale de chaque côté de la somme sur la règlette. */
+const RULER_SUM_MARGIN = 15
+const RULER_MIN_CELL_WIDTH_PX = 28
+
+function computeRulerBounds(
+  sum: number,
+  threshold: number
+): { rulerMin: number; rulerMax: number } {
+  const low = Math.min(sum, threshold)
+  const high = Math.max(sum, threshold)
+  const span = Math.max(high - low, 1)
+  const proportionalMin = Math.floor(low - span - 4)
+  const proportionalMax = Math.ceil(high + span + 2)
+  return {
+    rulerMin: Math.min(sum - RULER_SUM_MARGIN, proportionalMin),
+    rulerMax: Math.max(sum + RULER_SUM_MARGIN, proportionalMax),
+  }
+}
+
+function Phase2ThresholdRuler({
+  sum,
+  threshold,
+  neuronId,
+}: {
+  sum: number
+  threshold: number
+  neuronId: string
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const { rulerMin, rulerMax } = computeRulerBounds(sum, threshold)
+
+  const rulerValues = useMemo(() => {
+    const values: number[] = []
+    for (let value = rulerMin; value <= rulerMax; value += 1) {
+      values.push(value)
+    }
+    return values
+  }, [rulerMin, rulerMax])
+
+  const cellCount = Math.max(1, rulerValues.length)
+  const gridColumns = `repeat(${cellCount}, minmax(0, 1fr))`
+  const trackMinWidthPx = cellCount * RULER_MIN_CELL_WIDTH_PX
+
+  const clampPercent = (value: number) => Math.max(0, Math.min(100, value))
+  const thresholdPosition = clampPercent(
+    ((threshold - rulerMin + 1) / cellCount) * 100
+  )
+  const sumPosition = clampPercent(
+    ((sum - rulerMin + 0.5) / cellCount) * 100
+  )
+
+  useEffect(() => {
+    const container = scrollRef.current
+    if (!container) return
+
+    const frame = requestAnimationFrame(() => {
+      const track = container.firstElementChild as HTMLElement | null
+      if (!track) return
+
+      const cellWidth = track.scrollWidth / cellCount
+      const sumCenterPx = (sum - rulerMin + 0.5) * cellWidth
+      const targetScroll = sumCenterPx - container.clientWidth / 2
+      container.scrollLeft = Math.max(
+        0,
+        Math.min(targetScroll, container.scrollWidth - container.clientWidth)
+      )
+    })
+
+    return () => cancelAnimationFrame(frame)
+  }, [sum, threshold, neuronId, rulerMin, rulerMax, cellCount])
+
+  return (
+    <div className="w-full min-w-0">
+      <div ref={scrollRef} className="w-full overflow-x-auto">
+        <div
+          className="w-full"
+          style={{ minWidth: `max(100%, ${trackMinWidthPx}px)` }}
+        >
+          <div
+            className="grid w-full text-center text-xs font-bold text-astro"
+            style={{ gridTemplateColumns: gridColumns }}
+          >
+            {rulerValues.map((value) => (
+              <div key={`${neuronId}-top-${value}`}>{value}</div>
+            ))}
+          </div>
+
+          <div
+            className="relative mt-1 grid w-full rounded border-2 border-grey bg-grey/40"
+            style={{ gridTemplateColumns: gridColumns }}
+          >
+            {rulerValues.map((value) => (
+              <div
+                key={`${neuronId}-cell-${value}`}
+                className={`h-14 border-r border-grey/70 last:border-r-0 ${
+                  value > threshold ? 'bg-green/20' : 'bg-red/20'
+                }`}
+              />
+            ))}
+
+            <div
+              className="pointer-events-none absolute inset-y-0 z-20 w-[3px] bg-darkBlue"
+              style={{
+                left: `${thresholdPosition}%`,
+                transform: 'translateX(-50%)',
+              }}
+              aria-hidden
+            />
+
+            <div
+              className="pointer-events-none absolute top-1/2 z-30 h-4 w-4 rounded-sm border-2 border-yellow-hover bg-yellow shadow-sm"
+              style={{
+                left: `${sumPosition}%`,
+                transform: 'translate(-50%, -50%)',
+              }}
+              title={`Somme: ${sum}`}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-2 text-center text-xs font-semibold text-darkBlue">
+        Seuil : {threshold}
+      </div>
+      <div className="mt-1 text-center text-xs font-semibold text-yellow-hover">
+        Somme : {sum}
+      </div>
+    </div>
+  )
+}
 
 type ParsedTerm = {
   id: string
@@ -38,6 +169,14 @@ const NeuronPanel = ({
   onUpdateSumInput,
   onUpdateOutputInput,
 }: NeuronPanelProps) => {
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [])
+
   if (!neuron) return null
 
   const isOutput = neuron.layer === 'output'
@@ -81,43 +220,6 @@ const NeuronPanel = ({
     if (!Number.isNaN(userOutput)) onValidateOutput(neuronId, userOutput)
   }
 
-  const displayedSum = neuron.calculatedSum ?? expectedSum
-  const MIN_TICK_COUNT = 17
-  const rawMin = Math.floor(Math.min(displayedSum, neuron.threshold, 0)) - 4
-  const rawMax = Math.ceil(Math.max(displayedSum, neuron.threshold, 0)) + 4
-  let rulerMin = rawMin
-  let rulerMax = rawMax
-  const currentTickCount = rulerMax - rulerMin + 1
-  if (currentTickCount < MIN_TICK_COUNT) {
-    const missingTicks = MIN_TICK_COUNT - currentTickCount
-    const extraLeft = Math.floor(missingTicks / 2)
-    const extraRight = missingTicks - extraLeft
-    rulerMin -= extraLeft
-    rulerMax += extraRight
-  }
-  const rulerValues: number[] = []
-  for (let value = rulerMin; value <= rulerMax; value += 1) {
-    rulerValues.push(value)
-  }
-  const cellCount = Math.max(1, rulerValues.length)
-  const clampPercent = (value: number) => Math.max(0, Math.min(100, value))
-  // Zone verte : valeur strictement supérieure au seuil (à l’égalité, sortie ReLU = 0 → rouge).
-  const thresholdPosition = clampPercent(
-    ((neuron.threshold - rulerMin + 1) / cellCount) * 100
-  )
-  // La somme est matérialisée au centre de sa case.
-  const sumPosition = clampPercent(
-    ((displayedSum - rulerMin + 0.5) / cellCount) * 100
-  )
-
-  // Verrouille le scroll de la page pendant l'ouverture de la modale.
-  useEffect(() => {
-    const previousOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = previousOverflow
-    }
-  }, [])
 
   return (
     <div className="fixed inset-0 bg-darkBlue/40 z-50 flex items-end sm:items-center justify-center p-2 sm:p-4">
@@ -268,7 +370,7 @@ const NeuronPanel = ({
                   parseFloat(neuron.userSumInput) - expectedSum
                 ) >= 0.1 ? (
                 <div className="bg-red/20 border border-red text-red text-center py-2 rounded">
-                  ✗ Somme incorrecte. Attendu : {expectedSum}
+                  ✗ Somme incorrecte
                 </div>
               ) : null}
             </div>
@@ -339,66 +441,12 @@ const NeuronPanel = ({
                     sinon sortie = somme - seuil
                   </div>
                   <div className="rounded-lg border-2 border-grey bg-white p-3">
-                    <div className="overflow-x-auto">
-                      <div className="inline-block min-w-full">
-                        <div
-                          className="grid text-center text-xs font-bold text-astro"
-                          style={{
-                            gridTemplateColumns: `repeat(${rulerValues.length}, 32px)`,
-                          }}
-                        >
-                          {rulerValues.map((value) => (
-                            <div key={`top-${value}`}>{value}</div>
-                          ))}
-                        </div>
-
-                        <div
-                          className="relative mt-1 grid rounded border-2 border-grey bg-grey/40"
-                          style={{
-                            gridTemplateColumns: `repeat(${rulerValues.length}, 32px)`,
-                          }}
-                        >
-                          {rulerValues.map((value, index) => {
-                            const isGreenZone = value > neuron.threshold
-                            return (
-                              <div
-                                key={`cell-${value}-${index}`}
-                                className={`h-14 border-r border-grey/70 last:border-r-0 ${
-                                  isGreenZone ? 'bg-green/20' : 'bg-red/20'
-                                }`}
-                              />
-                            )
-                          })}
-
-                          <div
-                            className="pointer-events-none absolute inset-y-0 w-[3px] bg-darkBlue z-20"
-                            style={{
-                              left: `${thresholdPosition}%`,
-                              transform: 'translateX(-50%)',
-                            }}
-                          />
-
-                          {neuron.calculatedSum !== null && (
-                            <div
-                              className="pointer-events-none absolute top-1/2 z-30 h-4 w-4 -translate-y-1/2 rounded-sm border-2 border-yellow-hover bg-yellow shadow-sm"
-                              style={{
-                                left: `${sumPosition}%`,
-                                transform: 'translate(-50%, -50%)',
-                              }}
-                              title={`Somme: ${neuron.calculatedSum}`}
-                            />
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-2 text-center text-xs font-semibold text-darkBlue">
-                      Seuil : {neuron.threshold}
-                    </div>
                     {neuron.calculatedSum !== null && (
-                      <div className="mt-1 text-center text-xs font-semibold text-yellow-hover">
-                        Somme : {neuron.calculatedSum}
-                      </div>
+                      <Phase2ThresholdRuler
+                        sum={neuron.calculatedSum}
+                        threshold={neuron.threshold}
+                        neuronId={neuronId}
+                      />
                     )}
                   </div>
                 </div>
@@ -434,7 +482,7 @@ const NeuronPanel = ({
                     parseFloat(neuron.userOutputInput) - expectedOutput
                   ) >= 0.1 ? (
                   <div className="bg-red/20 border border-red text-red text-center py-2 rounded">
-                    ✗ Sortie incorrecte. Attendu : {expectedOutput}
+                    ✗ Sortie incorrecte
                   </div>
                 ) : null}
               </div>

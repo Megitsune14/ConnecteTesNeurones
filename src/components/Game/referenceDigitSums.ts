@@ -19,6 +19,14 @@ import type { SessionDigitEntry } from './sessionDigits'
 
 export type DigitVariantTag = 'p' | 'g' | 'u' | 'current' | 's'
 
+/** Libellé pastille sur la règlette mode seuil : p → w (bien reconnu), g → r (reconnu). */
+export function formatSeuilRulerBadgeLabel(
+  digit: number,
+  variant: Extract<DigitVariantTag, 'p' | 'g'>
+): string {
+  return `${digit}${variant === 'p' ? 'w' : 'r'}`
+}
+
 export type DigitReferenceMark = {
   digit: number
   variant: DigitVariantTag
@@ -169,12 +177,9 @@ function outputPreReLuSum(
 
 function exampleVariantsForDigit(
   digit: number
-): Extract<DigitVariantTag, 'p' | 'g' | 'u'>[] {
-  const entry = DIGIT_EXAMPLES[digit as keyof typeof DIGIT_EXAMPLES]
-  if (!entry) return []
-  const variants: Extract<DigitVariantTag, 'p' | 'g' | 'u'>[] = ['p', 'g']
-  if (entry.unrecognized) variants.push('u')
-  return variants
+): Extract<DigitVariantTag, 'p' | 'g'>[] {
+  if (!(digit in DIGIT_EXAMPLES)) return []
+  return ['p', 'g']
 }
 
 function exampleGrid(

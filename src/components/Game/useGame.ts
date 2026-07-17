@@ -6,6 +6,14 @@ import {
   type NetworkDecision,
   type OutputActivation,
 } from './networkDecision'
+import {
+  buildThresholdsFromNeurons,
+  clearSavedThresholds,
+  hasSavedThresholds,
+  loadSavedThresholds,
+  resolveInitialThreshold,
+  saveSavedThresholds,
+} from './savedThresholds'
 
 const hiddenInputsMap: Record<
   string,
@@ -258,6 +266,9 @@ export function useGame() {
   const [networkDecision, setNetworkDecision] = useState<NetworkDecision>({
     status: 'none',
   })
+  const [savedThresholdsPresent, setSavedThresholdsPresent] = useState(
+    () => hasSavedThresholds()
+  )
 
   const selectDigit = useCallback((digit: number) => {
     setSelectedDigit(digit)
@@ -358,8 +369,7 @@ export function useGame() {
     const newHiddenNeurons: NeuronData[] = NETWORK_STRUCTURE.hidden.map(
       (neuronId) => {
         const inputs = hiddenInputsMap[neuronId](inputValues)
-        const threshold =
-          NETWORK_STRUCTURE.hiddenThresholds[neuronId] ?? 0
+        const threshold = resolveInitialThreshold(neuronId, 'hidden')
         return {
           id: neuronId,
           layer: 'hidden',
@@ -522,8 +532,7 @@ export function useGame() {
     setOutputNeurons((prev) => {
       if (prev.length === 0) {
         return NETWORK_STRUCTURE.output.map((neuronId) => {
-          const threshold =
-            NETWORK_STRUCTURE.outputThresholds[neuronId] ?? 0
+          const threshold = resolveInitialThreshold(neuronId, 'output')
           const digit = parseInt(neuronId.replace('NEURONE', ''), 10) || 0
           return {
             id: neuronId,
@@ -725,29 +734,13 @@ export function useGame() {
     setNetworkDecision(resolveNetworkDecision(activations))
   }, [outputNeurons])
 
-  const resetThresholdsToDefaults = useCallback(() => {
-    const anyHiddenToReset = hiddenNeurons.some((n) => {
-      const t =
-        NETWORK_STRUCTURE.hiddenThresholds[
-          n.id as keyof typeof NETWORK_STRUCTURE.hiddenThresholds
-        ] ?? 0
-      return n.threshold !== t
-    })
-    const anyOutputToReset = outputNeurons.some((n) => {
-      const t =
-        NETWORK_STRUCTURE.outputThresholds[
-          n.id as keyof typeof NETWORK_STRUCTURE.outputThresholds
-        ] ?? 0
-      return n.threshold !== t
-    })
-    if (!anyHiddenToReset && !anyOutputToReset) return
-
+  const applyThresholdsMap = useCallback((thresholds: Record<string, number>) => {
     setNetworkDecision({ status: 'none' })
     setHiddenNeurons((prevH) => {
       let nextH = prevH
       let anyHiddenChanged = false
       for (const id of NETWORK_STRUCTURE.hidden) {
-        const t = NETWORK_STRUCTURE.hiddenThresholds[id] ?? 0
+        const t = thresholds[id] ?? NETWORK_STRUCTURE.hiddenThresholds[id] ?? 0
         const current = nextH.find((n) => n.id === id)
         if (!current || current.threshold === t) continue
         anyHiddenChanged = true
@@ -762,9 +755,11 @@ export function useGame() {
             }))
         return nextO.map((n) => {
           const t =
+            thresholds[n.id] ??
             NETWORK_STRUCTURE.outputThresholds[
               n.id as keyof typeof NETWORK_STRUCTURE.outputThresholds
-            ] ?? 0
+            ] ??
+            0
           if (n.threshold === t) return n
           const nextCalcOut =
             n.calculatedSum != null
@@ -782,9 +777,51 @@ export function useGame() {
       })
       return nextH
     })
-  }, [hiddenNeurons, outputNeurons])
+  }, [])
+
+  const resetThresholdsToDefaults = useCallback(() => {
+    const defaults: Record<string, number> = {}
+    for (const id of NETWORK_STRUCTURE.hidden) {
+      defaults[id] = NETWORK_STRUCTURE.hiddenThresholds[id] ?? 0
+    }
+    for (const id of NETWORK_STRUCTURE.output) {
+      defaults[id] = NETWORK_STRUCTURE.outputThresholds[id] ?? 0
+    }
+
+    const anyHiddenToReset = hiddenNeurons.some((n) => {
+      const t = defaults[n.id] ?? 0
+      return n.threshold !== t
+    })
+    const anyOutputToReset = outputNeurons.some((n) => {
+      const t = defaults[n.id] ?? 0
+      return n.threshold !== t
+    })
+    if (!anyHiddenToReset && !anyOutputToReset) return defaults
+
+    applyThresholdsMap(defaults)
+    return defaults
+  }, [hiddenNeurons, outputNeurons, applyThresholdsMap])
+
+  const clearSavedThresholdsAndReset = useCallback(() => {
+    clearSavedThresholds()
+    setSavedThresholdsPresent(false)
+    return resetThresholdsToDefaults()
+  }, [resetThresholdsToDefaults])
+
+  const restoreSavedThresholds = useCallback(() => {
+    const saved = loadSavedThresholds()
+    if (!saved) return null
+    applyThresholdsMap(saved)
+    return saved
+  }, [applyThresholdsMap])
 
   const resetToDigitSelection = useCallback(() => {
+    if (hiddenNeurons.length > 0 || outputNeurons.length > 0) {
+      saveSavedThresholds(
+        buildThresholdsFromNeurons(hiddenNeurons, outputNeurons)
+      )
+      setSavedThresholdsPresent(true)
+    }
     setSelectedDigit(null)
     setUserDrawnGrid(null)
     setInputLayerNeurons([])
@@ -804,7 +841,7 @@ export function useGame() {
     } catch {
       /* ignore */
     }
-  }, [])
+  }, [hiddenNeurons, outputNeurons])
 
   /** Retour à l'étape précédente (ou indique qu'il faut aller à l'accueil si on est sur le dessin). */
   const goBack = useCallback(() => {
@@ -905,6 +942,9 @@ export function useGame() {
     autoCalculateOutputNeurons,
     applySeuilThreshold,
     resetThresholdsToDefaults,
+    clearSavedThresholdsAndReset,
+    restoreSavedThresholds,
+    savedThresholdsPresent,
     handleValidateSum,
     handleValidateOutput,
     handleReturnToPhase1,

@@ -11,9 +11,10 @@ import ThresholdRuler, {
   THRESHOLD_RULER_MAX,
   THRESHOLD_RULER_MIN,
 } from '../ThresholdRuler'
+import { getDefaultThresholds } from '../savedThresholds'
 import { useSessionDigits } from '../sessionDigits'
 import {
-  formatAmbiguityMessage,
+  formatAmbiguityFromDecision,
   getOutputVerdictLabel,
   resolveNetworkDecision,
   type NetworkDecision,
@@ -55,7 +56,10 @@ interface NetworkInteractionStepProps {
   selectedDigit: number | null
   onReset: () => void
   onApplySeuilThreshold: (neuronId: string, threshold: number) => void
-  onResetThresholds: () => void
+  onResetThresholds: () => Record<string, number> | void
+  onClearSavedThresholdsAndReset: () => Record<string, number> | void
+  onRestoreSavedThresholds: () => Record<string, number> | null
+  savedThresholdsPresent: boolean
 }
 
 const NetworkInteractionStep = ({
@@ -71,6 +75,9 @@ const NetworkInteractionStep = ({
   onReset,
   onApplySeuilThreshold,
   onResetThresholds,
+  onClearSavedThresholdsAndReset,
+  onRestoreSavedThresholds,
+  savedThresholdsPresent,
 }: NetworkInteractionStepProps) => {
   type InteractionMode = 'calcul' | 'seuil'
   type ThresholdLayer = 'hidden' | 'output'
@@ -158,15 +165,16 @@ const NetworkInteractionStep = ({
   }
 
   const handleResetThresholds = () => {
-    onResetThresholds()
-    const defaults: Record<string, number> = {}
-    for (const id of NETWORK_STRUCTURE.hidden) {
-      defaults[id] = NETWORK_STRUCTURE.hiddenThresholds[id] ?? 0
-    }
-    for (const id of NETWORK_STRUCTURE.output) {
-      defaults[id] = NETWORK_STRUCTURE.outputThresholds[id] ?? 0
-    }
-    setThresholdValues(defaults)
+    const defaults = savedThresholdsPresent
+      ? onClearSavedThresholdsAndReset()
+      : onResetThresholds()
+    if (defaults) setThresholdValues(defaults)
+    else setThresholdValues(getDefaultThresholds())
+  }
+
+  const handleRestoreSavedThresholds = () => {
+    const restored = onRestoreSavedThresholds()
+    if (restored) setThresholdValues(restored)
   }
 
   const handleSaveCurrentDigit = () => {
@@ -203,20 +211,33 @@ const NetworkInteractionStep = ({
             Neurones de sortie
           </button>
         </div>
-        <button
-          type="button"
-          onClick={handleResetThresholds}
-          className="rounded-xl border-2 border-blue/40 bg-white px-4 py-2 text-sm font-semibold text-blue transition-colors hover:bg-blue/10 min-h-11"
-        >
-          Remettre les seuils par défaut
-        </button>
+        <div className="flex flex-wrap justify-center gap-2">
+          {savedThresholdsPresent && (
+            <button
+              type="button"
+              onClick={handleRestoreSavedThresholds}
+              className="rounded-xl border-2 border-blue bg-white px-4 py-2 text-sm font-semibold text-blue transition-colors hover:bg-blue/10 min-h-11"
+            >
+              Rétablir les seuils sauvegardés
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleResetThresholds}
+            className="rounded-xl border-2 border-blue/40 bg-white px-4 py-2 text-sm font-semibold text-blue transition-colors hover:bg-blue/10 min-h-11"
+          >
+            {savedThresholdsPresent
+              ? 'Supprimer les seuils sauvegardés'
+              : 'Remettre les seuils par défaut'}
+          </button>
+        </div>
       </div>
 
       {thresholdLayer === 'output' &&
         allOutputsDone &&
         localNetworkDecision.status === 'ambiguous' && (
         <p className="mb-4 rounded-xl border border-yellow-hover/60 bg-yellow/15 px-4 py-3 text-center text-sm font-semibold text-darkBlue">
-          {formatAmbiguityMessage(localNetworkDecision.digits)}
+          {formatAmbiguityFromDecision(localNetworkDecision)}
         </p>
       )}
 

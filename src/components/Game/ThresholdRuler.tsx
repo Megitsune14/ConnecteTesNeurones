@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import MiniDigitGrid from './MiniDigitGrid'
-import { DIGIT_MARK_BADGE_CLASSES, type DigitReferenceMark } from './referenceDigitSums'
+import { DIGIT_MARK_BADGE_CLASSES, formatSeuilRulerBadgeLabel, type DigitReferenceMark } from './referenceDigitSums'
 
 export const THRESHOLD_RULER_MIN = -50
 export const THRESHOLD_RULER_MAX = 50
@@ -19,9 +19,16 @@ function clampViewStart(start: number): number {
   return clamp(start, THRESHOLD_RULER_MIN, maxViewStart)
 }
 
-function computeInitialViewStart(threshold: number): number {
+function computeInitialViewStart(
+  threshold: number,
+  focalSum: number | null
+): number {
+  const focal =
+    focalSum != null
+      ? Math.round((focalSum + threshold) / 2)
+      : Math.round(threshold)
   return clampViewStart(
-    Math.round(threshold) - Math.floor(THRESHOLD_RULER_VISIBLE_CELLS / 2)
+    focal - Math.floor(THRESHOLD_RULER_VISIBLE_CELLS / 2)
   )
 }
 
@@ -52,12 +59,16 @@ const ThresholdRuler = ({
   hasCurrentGrid,
 }: ThresholdRulerProps) => {
   const [viewStart, setViewStart] = useState(() =>
-    computeInitialViewStart(thresholdValue)
+    computeInitialViewStart(thresholdValue, displayedSum)
   )
 
   useEffect(() => {
-    setViewStart((prev) => ensureValueVisible(prev, thresholdValue))
-  }, [thresholdValue])
+    setViewStart((prev) => {
+      const next = computeInitialViewStart(thresholdValue, displayedSum)
+      if (displayedSum != null) return next
+      return ensureValueVisible(prev, thresholdValue)
+    })
+  }, [thresholdValue, displayedSum])
 
   const viewEnd = viewStart + THRESHOLD_RULER_VISIBLE_CELLS - 1
   const rulerValues = useMemo(
@@ -175,7 +186,7 @@ const ThresholdRuler = ({
                     }
                     pattern={m.grid}
                   />
-                ) : m.variant === 'p' || m.variant === 'g' || m.variant === 'u' ? (
+                ) : m.variant === 'p' || m.variant === 'g' ? (
                   <span
                     key={`${neuronId}-${m.digit}-${m.variant}`}
                     className={[
@@ -184,15 +195,10 @@ const ThresholdRuler = ({
                         'border-grey bg-white text-darkBlue',
                     ].join(' ')}
                     title={`Chiffre ${m.digit}, motif ${
-                      m.variant === 'p'
-                        ? 'perfect'
-                        : m.variant === 'g'
-                          ? 'good'
-                          : 'unrecognized'
+                      m.variant === 'p' ? 'bien reconnu' : 'reconnu'
                     } (DIGIT_EXAMPLES) — somme ${m.sum}`}
                   >
-                    {m.digit}
-                    {m.variant}
+                    {formatSeuilRulerBadgeLabel(m.digit, m.variant)}
                   </span>
                 ) : null
               )}

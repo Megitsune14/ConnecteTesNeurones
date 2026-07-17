@@ -6,7 +6,11 @@ export type OutputActivation = {
 export type NetworkDecision =
   | { status: 'none' }
   | { status: 'clear'; digit: number }
-  | { status: 'ambiguous'; digits: number[] }
+  | {
+      status: 'ambiguous'
+      digits: number[]
+      activations: OutputActivation[]
+    }
 
 /** Décision du réseau : aucun actif, un seul actif (clair), ou plusieurs actifs (ambigu). */
 export function resolveNetworkDecision(
@@ -17,7 +21,11 @@ export function resolveNetworkDecision(
     .sort((a, b) => a.digit - b.digit)
   if (active.length === 0) return { status: 'none' }
   if (active.length === 1) return { status: 'clear', digit: active[0]!.digit }
-  return { status: 'ambiguous', digits: active.map((a) => a.digit) }
+  return {
+    status: 'ambiguous',
+    digits: active.map((a) => a.digit),
+    activations: active,
+  }
 }
 
 /** Chiffre unique reconnu, ou null si aucun ou ambiguïté. */
@@ -37,8 +45,53 @@ export function formatDigitsList(digits: number[]): string {
   return `${rest} et ${last}`
 }
 
-export function formatAmbiguityMessage(digits: number[]): string {
+function formatPercentParts(parts: string[]): string {
+  if (parts.length === 0) return ''
+  if (parts.length === 1) return parts[0]!
+  if (parts.length === 2) return `${parts[0]} et ${parts[1]}`
+  const last = parts[parts.length - 1]!
+  const rest = parts.slice(0, -1).join(', ')
+  return `${rest} et ${last}`
+}
+
+export function formatAmbiguityPercentages(
+  activations: OutputActivation[]
+): string {
+  const active = activations
+    .filter((a) => a.value > 0)
+    .sort((a, b) => a.digit - b.digit)
+  const total = active.reduce((sum, a) => sum + a.value, 0)
+  if (active.length === 0 || total <= 0) return ''
+
+  const parts = active.map(
+    (a) => `${a.digit} à ${Math.round((a.value / total) * 100)}%`
+  )
+  return formatPercentParts(parts)
+}
+
+export function formatAmbiguityMessage(
+  digits: number[],
+  activations?: OutputActivation[]
+): string {
+  const active =
+    activations != null
+      ? activations
+          .filter((a) => a.value > 0 && digits.includes(a.digit))
+          .sort((a, b) => a.digit - b.digit)
+      : []
+
+  const percentages = formatAmbiguityPercentages(active)
+  if (percentages) {
+    return `Ambiguïté : ${percentages}`
+  }
+
   return `Ambiguïté : le réseau active ${formatDigitsList(digits)}`
+}
+
+export function formatAmbiguityFromDecision(
+  decision: Extract<NetworkDecision, { status: 'ambiguous' }>
+): string {
+  return formatAmbiguityMessage(decision.digits, decision.activations)
 }
 
 export function getOutputVerdictLabel(
@@ -65,7 +118,7 @@ export function getOutputVerdictLabel(
     if (activation > 0) {
       return labelStyle === 'compact'
         ? 'Ambiguïté'
-        : `↔ Actif — ${formatAmbiguityMessage(decision.digits)}`
+        : `↔ Actif — ${formatAmbiguityFromDecision(decision)}`
     }
     return `✗ Ce n'est pas un ${neuronDigit}`
   }
