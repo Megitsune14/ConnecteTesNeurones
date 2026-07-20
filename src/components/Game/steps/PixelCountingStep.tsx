@@ -195,7 +195,7 @@ const PixelCountingStep = ({
                     >
                       {userCounts[neuronId] === actualCount
                         ? '✓ Correct !'
-                        : `✗ Correct: ${actualCount}`}
+                        : '✗ Incorrect'}
                     </div>
                   )}
                 </div>

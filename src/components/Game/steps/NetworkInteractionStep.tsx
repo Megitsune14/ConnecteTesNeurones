@@ -421,7 +421,7 @@ const NetworkInteractionStep = ({
           ].join(' ')}
           aria-disabled={!allCalculDone}
         >
-          Mode seuil
+          Mode apprentissage
         </button>
       </div>
       <div className="w-full min-w-0 overflow-x-auto pb-2">

@@ -26,7 +26,7 @@ const HomePage = () => {
           <p>
             Vous dessinez sur une grille, comptez les pixels par bandelette,
             calculez vous-même les sommes et les seuils, puis suivez la décision
-            du réseau, de la grille au verdict final. En mode seuil, vous
+            du réseau, de la grille au verdict final. En mode apprentissage, vous
             ajustez les seuils pour affiner la reconnaissance.
           </p>
         </div>

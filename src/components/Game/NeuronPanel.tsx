@@ -461,7 +461,7 @@ const NeuronPanel = ({
               ⚠️
             </span>
             <p className="min-w-0 text-sm font-semibold leading-relaxed">
-              Le seuil a été modifié en mode seuil : la sortie affichée est
+              Le seuil a été modifié en mode apprentissage : la sortie affichée est
               recalculée avec le nouveau seuil. Validez à nouveau les étapes
               ci-dessous pour confirmer.
             </p>

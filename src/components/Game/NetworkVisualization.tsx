@@ -417,6 +417,27 @@ function buildDecisionNodeData(
   }
 }
 
+/** Motif gris à barreaux diagonaux : neurone à recalculer après changement de seuil. */
+const RECALC_NODE_PATTERN = `data:image/svg+xml,${encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 10 10">
+    <rect width="10" height="10" fill="#B4B4BA"/>
+    <path d="M-1 11 L11 -1 M-1 1 L1 -1 M9 11 L11 9" stroke="#767680" stroke-width="1.25" fill="none"/>
+  </svg>`
+)}`
+
+const RECALC_NODE_WARNING_STYLE = {
+  'background-color': '#B4B4BA',
+  'background-image': RECALC_NODE_PATTERN,
+  'background-fit': 'none',
+  'background-width': '10px',
+  'background-height': '10px',
+  'background-repeat': 'repeat',
+  'border-color': '#6B6B73',
+  'border-width': 3,
+  color: '#1A182D',
+  'background-opacity': 1,
+} as const
+
 const CYTOSCAPE_STYLE = [
   {
     selector: 'node',
@@ -514,13 +535,7 @@ const CYTOSCAPE_STYLE = [
   },
   {
     selector: 'node[layer = "hidden"][warning = "true"]',
-    style: {
-      'background-color': '#F9BB12',
-      'border-color': '#E6A610',
-      'border-width': 4,
-      color: '#1A182D',
-      'background-opacity': 0.95,
-    },
+    style: RECALC_NODE_WARNING_STYLE,
   },
   {
     selector: 'node[layer = "output"]',
@@ -549,13 +564,7 @@ const CYTOSCAPE_STYLE = [
   },
   {
     selector: 'node[layer = "output"][warning = "true"]',
-    style: {
-      'background-color': '#F9BB12',
-      'border-color': '#E6A610',
-      'border-width': 4,
-      color: '#1A182D',
-      'background-opacity': 0.95,
-    },
+    style: RECALC_NODE_WARNING_STYLE,
   },
   {
     selector: 'node[type = "grid"]',
