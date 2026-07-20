@@ -1,11 +1,9 @@
 import { useCallback, useState } from 'react'
-import { RECOGNIZED_DIGITS } from './constants'
 
 export const STORAGE_KEY_SESSION_DIGITS = 'gameSessionDigits'
 
 export type SessionDigitEntry = {
   id: string
-  digit: number
   grid: number[][]
   savedAt: number
 }
@@ -35,8 +33,6 @@ export function loadSessionDigits(): SessionDigitEntry[] {
         entry != null &&
         typeof entry === 'object' &&
         typeof (entry as SessionDigitEntry).id === 'string' &&
-        typeof (entry as SessionDigitEntry).digit === 'number' &&
-        RECOGNIZED_DIGITS.includes((entry as SessionDigitEntry).digit) &&
         isValidGrid((entry as SessionDigitEntry).grid) &&
         typeof (entry as SessionDigitEntry).savedAt === 'number'
     )
@@ -58,11 +54,10 @@ export function useSessionDigits() {
     loadSessionDigits
   )
 
-  const saveDigit = useCallback((digit: number, grid: number[][]) => {
-    if (!RECOGNIZED_DIGITS.includes(digit) || !isValidGrid(grid)) return
+  const saveDigit = useCallback((grid: number[][]) => {
+    if (!isValidGrid(grid)) return
     const entry: SessionDigitEntry = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
-      digit,
       grid: cloneGrid(grid),
       savedAt: Date.now(),
     }

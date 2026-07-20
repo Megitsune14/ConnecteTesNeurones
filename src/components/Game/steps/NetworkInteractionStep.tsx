@@ -178,8 +178,8 @@ const NetworkInteractionStep = ({
   }
 
   const handleSaveCurrentDigit = () => {
-    if (pattern == null || selectedDigit == null) return
-    saveDigit(selectedDigit, pattern)
+    if (pattern == null) return
+    saveDigit(pattern)
   }
 
   const thresholdPanel = (

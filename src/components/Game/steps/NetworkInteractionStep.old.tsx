@@ -194,7 +194,7 @@ const NetworkInteractionStep = ({
 
   const handleSaveCurrentDigit = () => {
     if (pattern == null || selectedDigit == null) return
-    saveDigit(selectedDigit, pattern)
+    saveDigit(pattern)
   }
 
   const beforePanel = (

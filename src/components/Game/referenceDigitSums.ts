@@ -199,7 +199,7 @@ function appendSessionMarks(
 ): void {
   for (const entry of sessionDigits) {
     marks.push({
-      digit: entry.digit,
+      digit: -1,
       variant: 's',
       sum: sumForGrid(entry.grid),
       grid: entry.grid,
@@ -299,7 +299,7 @@ function buildRecognitionResult(
     isAmbiguous,
     ambiguousDigits,
     isRecognized:
-      variant === 'current'
+      variant === 'current' || variant === 's'
         ? decision.status === 'clear'
         : decision.status === 'clear' && decision.digit === expectedDigit,
     outputValues,
@@ -347,7 +347,7 @@ export function computeAllDigitRecognitions(
     )
     results.push(
       buildRecognitionResult(
-        entry.digit,
+        -1,
         's',
         decision,
         outputValues,

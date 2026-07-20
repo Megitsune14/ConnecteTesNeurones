@@ -59,7 +59,10 @@ function networkOutcomeLabel(result: DigitRecognitionResult): string {
 }
 
 function recognitionStatusLabel(result: DigitRecognitionResult): string {
-  if (result.variant === 'current') {
+  if (result.variant === 'current' || result.variant === 's') {
+    if (result.isAmbiguous && result.decision.status === 'ambiguous') {
+      return formatAmbiguityFromDecision(result.decision)
+    }
     if (result.isRecognized && result.recognizedDigit != null) {
       return `C'est un ${result.recognizedDigit}`
     }
@@ -69,7 +72,7 @@ function recognitionStatusLabel(result: DigitRecognitionResult): string {
 }
 
 function recognitionCardClasses(result: DigitRecognitionResult): string {
-  if (result.variant === 'current') {
+  if (result.variant === 'current' || result.variant === 's') {
     if (result.isRecognized) return 'border-green/50 bg-green/10'
     if (result.isAmbiguous) return 'border-yellow-hover/60 bg-yellow/15'
     return 'border-grey bg-white'
@@ -87,7 +90,7 @@ function recognitionCardClasses(result: DigitRecognitionResult): string {
 }
 
 function recognitionTextClasses(result: DigitRecognitionResult): string {
-  if (result.variant === 'current') {
+  if (result.variant === 'current' || result.variant === 's') {
     if (result.isRecognized) return 'text-green'
     if (result.isAmbiguous) return 'text-darkBlue'
     return 'text-astro'
@@ -101,7 +104,7 @@ function recognitionTextClasses(result: DigitRecognitionResult): string {
 }
 
 function recognitionSymbol(result: DigitRecognitionResult): string {
-  if (result.variant === 'current') {
+  if (result.variant === 'current' || result.variant === 's') {
     if (result.isRecognized && result.recognizedDigit != null) {
       return `✓ ${result.recognizedDigit}`
     }
@@ -161,7 +164,10 @@ const ThresholdDigitSidePanel = ({
   const allReferencesOk =
     recognizedCount === referenceRecognitions.length &&
     referenceRecognitions.length > 0
-  const canSaveCurrent = pattern != null && selectedDigit != null
+  const canSaveCurrent =
+    pattern != null &&
+    (selectedDigit != null ||
+      currentRecognition?.decision.status === 'clear')
 
   return (
     <aside
@@ -299,7 +305,7 @@ const ThresholdDigitSidePanel = ({
                         <MiniDigitGrid
                           pattern={entry.grid}
                           cellPx={4}
-                          aria-label={`Dessin session — chiffre ${entry.digit}`}
+                          aria-label="Dessin session"
                         />
                         <div className="flex shrink-0 flex-col items-end gap-1">
                           <span
@@ -317,7 +323,7 @@ const ThresholdDigitSidePanel = ({
                         </div>
                       </div>
                       <p className="mt-1.5 font-medium text-astro">
-                        {VARIANT_LABELS.s} — attendu {entry.digit}
+                        {VARIANT_LABELS.s}
                       </p>
                       <p
                         className={`mt-0.5 font-semibold ${recognitionTextClasses(result)}`}
